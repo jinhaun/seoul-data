@@ -156,7 +156,7 @@ footer{padding:0 16px 30px;color:var(--muted);font-size:10px;font-weight:700;lin
 <body>
 <div class="app">
   <aside class="rail">
-    <div class="brand">서울<em>매시간</em><small>SEOUL DATA LOG</small></div>
+    <div class="brand">서울<em>매시간</em><small>서울 데이터 기록장</small></div>
     <div class="nav-label">보기</div>
     <nav class="nav" id="nav">
       <a href="#now" class="on"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>지금의 서울</a>
@@ -166,7 +166,7 @@ footer{padding:0 16px 30px;color:var(--muted);font-size:10px;font-weight:700;lin
       <a href="#fx"><svg viewBox="0 0 24 24"><path d="M4 7h13l-3-3M20 17H7l3 3"/></svg>환율·숙소</a>
       <a href="#log"><svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>수집 기록</a>
     </nav>
-    <div class="rail-foot">서울 열린데이터광장 공공데이터를<br>GitHub Actions가 매시간 모읍니다.</div>
+    <div class="rail-foot">서울 열린데이터광장 공공데이터를<br>매시간 자동으로 모읍니다.</div>
   </aside>
 
   <div class="main">
@@ -177,7 +177,7 @@ footer{padding:0 16px 30px;color:var(--muted);font-size:10px;font-weight:700;lin
 
     <section class="hero" id="now">
       <div>
-        <p class="eyebrow">SEOUL RIGHT NOW</p>
+        <p class="eyebrow">지금 이 순간의 서울</p>
         <h2 id="headline">서울 121곳의 지금을 모으고 있어요.</h2>
         <p class="sub" id="heroSub"></p>
       </div>
@@ -199,7 +199,7 @@ footer{padding:0 16px 30px;color:var(--muted);font-size:10px;font-weight:700;lin
       </div>
       <div class="col">
         <article class="card">
-          <div class="card-h"><div><h3>붐비는 곳 TOP 10</h3><p id="rankSub"></p></div></div>
+          <div class="card-h"><div><h3>붐비는 곳 상위 10곳</h3><p id="rankSub"></p></div></div>
           <div class="card-b"><ol class="rank" id="rank"></ol></div>
         </article>
         <article class="card">
@@ -220,7 +220,7 @@ footer{padding:0 16px 30px;color:var(--muted);font-size:10px;font-weight:700;lin
       </article>
 
       <article class="card full" id="fx">
-        <div class="card-h"><div><h3>환율</h3><p>원화 기준 · 최근 120 고시일 · 유럽중앙은행(ECB) 기준환율</p></div><span class="chip">한 달 변화</span></div>
+        <div class="card-h"><div><h3>환율</h3><p>원화 기준 · 최근 120 고시일 · 유럽중앙은행 기준환율</p></div><span class="chip">한 달 변화</span></div>
         <div class="card-b"><div class="fx" id="fxBox"></div></div>
       </article>
 
@@ -240,19 +240,19 @@ footer{padding:0 16px 30px;color:var(--muted);font-size:10px;font-weight:700;lin
           <div class="card-b scroll" style="max-height:260px"><table id="tNew"></table></div>
         </article>
         <article class="card">
-          <div class="card-h"><div><h3>자료 받기</h3><p>모두 CSV(엑셀로 열림) · 월 폴더 → 날짜 파일</p></div></div>
+          <div class="card-h"><div><h3>자료 받기</h3><p>모두 엑셀로 열리는 파일 · 월 폴더 → 날짜 파일</p></div></div>
           <div class="card-b dl">
             <a href="https://github.com/jinhaun/seoul-data/tree/main/data/realtime"><b>실시간 121곳</b><span>혼잡도·인구·날씨</span></a>
             <a href="https://github.com/jinhaun/seoul-data/tree/main/data/foreigner"><b>외국인</b><span>자치구×시간×국적</span></a>
             <a href="https://github.com/jinhaun/seoul-data/tree/main/data/events"><b>행사</b><span>날짜별</span></a>
             <a href="https://github.com/jinhaun/seoul-data/tree/main/data/lodging"><b>숙박</b><span>목록·변경</span></a>
             <a href="https://github.com/jinhaun/seoul-data/tree/main/data/exchange"><b>환율</b><span>일별</span></a>
-            <a href="https://github.com/jinhaun/seoul-data/archive/refs/heads/main.zip"><b>전체 zip</b><span>한 번에</span></a>
+            <a href="https://github.com/jinhaun/seoul-data/archive/refs/heads/main.zip"><b>전체 받기</b><span>압축 파일 하나로</span></a>
           </div>
         </article>
       </div>
     </div>
-    <footer>출처 · 서울 열린데이터광장(공공누리 제1유형): 실시간 도시데이터, 외국인 생활인구, 문화행사, 교통통제, 숙박업 인허가 · 서울시설공단 공연장 일정 · 환율 European Central Bank(Frankfurter) · 글꼴 나눔스퀘어(NAVER, SIL OFL) · <span id="upd"></span></footer>
+    <footer>출처 · 서울 열린데이터광장(공공누리 제1유형): 실시간 도시데이터, 외국인 생활인구, 문화행사, 교통통제, 숙박업 인허가 · 서울시설공단 공연장 일정 · 환율 유럽중앙은행 기준환율 · 글꼴 나눔스퀘어(네이버, 무료 공개 글꼴) · <span id="upd"></span></footer>
   </div>
 </div>
 
