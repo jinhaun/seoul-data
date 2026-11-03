@@ -1,0 +1,42 @@
+name: 매일 작업 (행사·숙박·외국인·환율)
+
+on:
+  schedule:
+    - cron: '5 0 * * *'    # 매일 00:05 UTC = 한국 시간 09:05
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-commit
+  cancel-in-progress: false
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 행사·숙박·외국인 생활인구·환율
+        shell: pwsh
+        env:
+          SEOUL_API_KEY: ${{ secrets.SEOUL_API_KEY }}
+        run: ./scripts/daily.ps1
+
+      - name: 사이트 요약 갱신
+        if: always()
+        shell: pwsh
+        run: ./scripts/build_site_data.ps1
+
+      - name: 저장소에 저장
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data site
+          if git diff --cached --quiet; then echo "바뀐 내용 없음"; exit 0; fi
+          git commit -m "매일 작업 $(TZ=Asia/Seoul date '+%Y-%m-%d')"
+          for i in 1 2 3; do git pull --rebase && git push && exit 0; sleep 10; done
+          exit 1

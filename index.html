@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>서울 데이터 수집</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#f7f7f5;--card:#ffffff;--ink:#1d1d1b;--ink2:#55554f;--muted:#8a8a83;--line:#e4e4df;--grid:#ecece8;--accent:#2a78d6;
+  --good:#1a8f5a;--warn:#c98a00;--bad:#d1453b;--seq:#2a78d6;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141413;--card:#1e1e1c;--ink:#eeeee9;--ink2:#b7b7b0;--muted:#85857e;--line:#33332f;--grid:#2a2a27;--accent:#5b9be6;
+  --good:#3fbf83;--warn:#e2a92a;--bad:#ec6a60;--seq:#5b9be6;
+}}
+:root[data-theme="dark"]{
+  --bg:#141413;--card:#1e1e1c;--ink:#eeeee9;--ink2:#b7b7b0;--muted:#85857e;--line:#33332f;--grid:#2a2a27;--accent:#5b9be6;
+  --good:#3fbf83;--warn:#e2a92a;--bad:#ec6a60;--seq:#5b9be6;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:22px;margin:0 0 4px}
+.sub{color:var(--ink2);margin:0 0 18px;font-size:14px}
+nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+nav button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:7px 14px;font:inherit;font-size:14px;cursor:pointer}
+nav button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+section{display:none}section.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.card h2{font-size:16px;margin:0 0 2px}
+.card .note{color:var(--muted);font-size:13px;margin:0 0 10px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.tile .k{color:var(--ink2);font-size:13px}.tile .v{font-size:24px;font-weight:700;margin-top:2px}.tile .s{color:var(--muted);font-size:12px}
+.chart{position:relative;height:260px}.chart.tall{height:340px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:760px){.grid2{grid-template-columns:1fr}.chart{height:230px}}
+.tbl{width:100%;overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--ink2);font-weight:600;white-space:nowrap}
+td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+a{color:var(--accent)}
+.pill{display:inline-block;border-radius:6px;padding:1px 7px;font-size:12px;border:1px solid var(--line);color:var(--ink2);white-space:nowrap}
+.lvl::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:var(--muted)}
+.lvl.l1::before{background:var(--good)}.lvl.l2::before{background:var(--seq)}.lvl.l3::before{background:var(--warn)}.lvl.l4::before{background:var(--bad)}
+details summary{cursor:pointer;color:var(--ink2);font-size:13px;margin-top:8px}
+ul.dl{margin:6px 0 0;padding-left:18px}ul.dl li{margin:3px 0}
+footer{color:var(--muted);font-size:12.5px;margin-top:24px;line-height:1.7}
+.err{color:var(--bad)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>서울 데이터 수집</h1>
+  <p class="sub">서울 실시간 도시데이터 121곳(1시간마다), 외국인 생활인구, 행사, 환율·숙박을 자동으로 모읍니다. · <span id="updated">불러오는 중…</span></p>
+  <nav role="tablist">
+    <button role="tab" data-tab="status" aria-selected="true">📋 수집 현황</button>
+    <button role="tab" data-tab="foreigner" aria-selected="false">🌏 외국인 동향</button>
+    <button role="tab" data-tab="events" aria-selected="false">🎉 오늘의 행사</button>
+    <button role="tab" data-tab="fx" aria-selected="false">💱🏨 환율·숙박</button>
+  </nav>
+
+  <section id="status" class="on">
+    <div class="tiles" id="statusTiles"></div>
+    <div class="card"><h2>날짜별 수집 횟수</h2><p class="note">하루 24번(1시간마다)이 정상입니다. 노트북 시절(~12월)은 30분마다라서 48번까지 있습니다.</p><div class="chart"><canvas id="cStatus"></canvas></div></div>
+    <div class="card"><h2>121곳 인구 합계 흐름 (최근 7일)</h2><p class="note">각 시각마다 121곳 '인구 최대값'을 더한 값입니다. 장소끼리 겹치는 사람이 있어 실제 서울 인구와는 다릅니다.</p><div class="chart"><canvas id="cFlow"></canvas></div></div>
+    <div class="card"><h2>지금 붐비는 곳 상위 15</h2><p class="note" id="nowBase"></p><div class="tbl"><table id="tNow"></table></div></div>
+  </section>
+
+  <section id="foreigner">
+    <div class="card"><h2>단기체류 외국인 하루 평균 (국적별)</h2><p class="note">서울시 외국인 생활인구(단기체류) · 하루 24시간 평균 · 약 4일 늦게 공개됩니다.</p><div class="chart tall"><canvas id="cNat"></canvas></div>
+      <details><summary>표로 보기</summary><div class="tbl"><table id="tNat"></table></div></details></div>
+    <div class="card"><h2>자치구별 단기체류 외국인 (최근 7일 평균)</h2><p class="note" id="guRange"></p><div class="chart tall"><canvas id="cGu"></canvas></div></div>
+  </section>
+
+  <section id="events">
+    <div class="tiles" id="evTiles"></div>
+    <div class="card"><h2>주요 행사</h2><p class="note">서울시 공식 자료(문화행사·공연장 일정·교통통제) 중 사람이 많이 모이는 행사만 골랐습니다. 가까운 곳 = 121곳 중 가장 가까운 장소.</p><div class="tbl"><table id="tEv"></table></div></div>
+    <div class="card" id="webCard"><h2>웹에서 확인한 행사</h2><p class="note">공식 자료에 없는 공연·경기 등 (노트북 반납 전까지만 추가됩니다)</p><div class="tbl"><table id="tWeb"></table></div></div>
+  </section>
+
+  <section id="fx">
+    <div class="card"><h2>원화 환율 (최근 120 고시일)</h2><p class="note">유럽중앙은행(ECB) 기준환율로 계산 · 단위가 달라 통화마다 따로 그렸습니다.</p>
+      <div class="grid2"><div class="chart"><canvas id="cUSD"></canvas></div><div class="chart"><canvas id="cJPY"></canvas></div><div class="chart"><canvas id="cCNY"></canvas></div><div class="chart"><canvas id="cTHB"></canvas></div></div></div>
+    <div class="card"><h2>서울 숙박업소</h2><p class="note">서울시 인허가 자료 · 매일 비교해서 새로 생기거나 바뀐 곳을 기록합니다.</p><div class="tbl"><table id="tLodge"></table></div></div>
+    <div class="card"><h2>최근 새로 등록된 숙소</h2><div class="tbl"><table id="tNew"></table></div></div>
+  </section>
+
+  <div class="card">
+    <h2>📥 데이터 내려받기</h2>
+    <p class="note">모든 파일은 CSV(엑셀로 열림)이고, 월 폴더 → 날짜 파일 순서로 정리돼 있습니다.</p>
+    <ul class="dl">
+      <li><a href="https://github.com/jinhaun/seoul-data/tree/main/data/realtime">실시간 121곳</a> — 날짜마다 1시간 단위 혼잡도·인구·연령·날씨·교통</li>
+      <li><a href="https://github.com/jinhaun/seoul-data/tree/main/data/foreigner">외국인 생활인구</a> — 단기/장기, 자치구 × 시간 × 국적</li>
+      <li><a href="https://github.com/jinhaun/seoul-data/tree/main/data/events">행사</a> · <a href="https://github.com/jinhaun/seoul-data/tree/main/data/lodging">숙박</a> · <a href="https://github.com/jinhaun/seoul-data/tree/main/data/exchange">환율</a> · <a href="https://github.com/jinhaun/seoul-data/tree/main/data/status">수집 기록</a></li>
+      <li><a href="https://github.com/jinhaun/seoul-data/releases">원본(압축 JSON)</a> — 달마다 묶음</li>
+      <li><a href="https://github.com/jinhaun/seoul-data/archive/refs/heads/main.zip">전체 한 번에 (zip)</a></li>
+    </ul>
+  </div>
+
+  <footer>
+    출처: 서울 열린데이터광장(공공누리 제1유형, 출처표시) — 서울시 실시간 도시데이터, 외국인 생활인구, 문화행사 정보, 교통통제 정보, 숙박업 인허가 정보 · 서울시설공단 공연장 일정 · 환율: European Central Bank(Frankfurter API).<br>
+    자동 수집: GitHub Actions · 이 페이지의 숫자는 수집 직후 자동으로 바뀝니다.
+  </footer>
+</div>
+
+<script>
+const NAT_COLOR = {'미국':'#2a78d6','인도':'#eb6834','일본':'#1baf7a','중국':'#eda100','태국':'#e87ba4','프랑스':'#6250d6',
+  '대만':'#16a3b8','베트남':'#9a6a2f','필리핀':'#c2410c','몽골':'#0f766e','러시아':'#7c3aed','홍콩':'#64748b','캐나다':'#be123c'};
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = n => (n == null || isNaN(n)) ? '-' : Number(n).toLocaleString('ko-KR');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const link = (href, text) => /^https?:\/\//.test(href || '') ? `<a href="${esc(href)}" target="_blank" rel="noopener">${esc(text)}</a>` : esc(text);
+const LVL = {'여유':'l1','보통':'l2','약간 붐빔':'l3','붐빔':'l4'};
+const charts = [];
+
+function baseOpts(extra = {}) {
+  const ink2 = css('--ink2'), grid = css('--grid');
+  return Object.assign({
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: {mode: 'index', intersect: false},
+    plugins: {legend: {labels: {color: ink2, boxWidth: 12, boxHeight: 12, usePointStyle: true}},
+              tooltip: {callbacks: {label: c => ` ${c.dataset.label || ''}: ${fmt(c.parsed.y ?? c.parsed.x)}`}}},
+    scales: {x: {ticks: {color: ink2, maxRotation: 0, autoSkip: true, maxTicksLimit: 8}, grid: {display: false}, border: {color: grid}},
+             y: {ticks: {color: ink2, callback: v => fmt(v)}, grid: {color: grid}, border: {display: false}}}
+  }, extra);
+}
+function make(id, cfg) { const c = new Chart(document.getElementById(id), cfg); charts.push(c); return c; }
+function table(id, head, rows) {
+  document.getElementById(id).innerHTML = '<thead><tr>' + head.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>' +
+    (rows.length ? rows.map(r => '<tr>' + r.join('') + '</tr>').join('') : `<tr><td colspan="${head.length}" style="color:var(--muted)">아직 자료가 없습니다</td></tr>`) + '</tbody>';
+}
+const td = (v, num) => `<td${num ? ' class="n"' : ''}>${v}</td>`;
+const tile = (k, v, s) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s || ''}</div></div>`;
+
+function renderStatus(d) {
+  const st = d.status || [], lr = d.last_run;
+  const today = st[st.length - 1];
+  document.getElementById('statusTiles').innerHTML =
+    tile('마지막 수집', lr ? esc(lr.at.slice(5)) : '-', lr ? `인구 기준 ${esc(lr.base.slice(11))}` : '') +
+    tile('성공 / 실패', lr ? `${lr.ok} / ${lr.fail}` : '-', '121곳 중') +
+    tile('오늘 수집 횟수', today ? today.snaps : '-', today ? `${today.date} (${today.wd})` : '') +
+    tile('모인 날짜', st.length ? `${st.length}일` : '-', '최근 30일 기준');
+  make('cStatus', {type: 'bar', data: {labels: st.map(s => s.date.slice(5) + ' ' + s.wd),
+    datasets: [{label: '수집 횟수', data: st.map(s => s.snaps), backgroundColor: css('--seq'), borderRadius: {topLeft: 4, topRight: 4}, borderSkipped: 'bottom', maxBarThickness: 22}]},
+    options: baseOpts({plugins: {legend: {display: false}}})});
+  const fl = d.flow || [];
+  make('cFlow', {type: 'line', data: {labels: fl.map(f => f.t.slice(5)),
+    datasets: [{label: '121곳 인구 합계', data: fl.map(f => f.pop), borderColor: css('--seq'), borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: .25}]},
+    options: baseOpts({plugins: {legend: {display: false}}})});
+  const now = d.now;
+  document.getElementById('nowBase').textContent = now ? `인구 기준 ${now.base} · 혼잡도: ` + (now.congest || []).map(c => `${c.lvl} ${c.n}곳`).join(', ') : '';
+  table('tNow', ['#', '장소', '혼잡도', '인구(최소~최대)', '기온'], (now?.top || []).map((t, i) =>
+    [td(i + 1, 1), td(esc(t.place)), td(`<span class="lvl ${LVL[t.lvl] || ''}">${esc(t.lvl)}</span>`), td(`${fmt(t.min)} ~ ${fmt(t.max)}`, 1), td(t.temp ? esc(t.temp) + '℃' : '-', 1)]));
+}
+
+function renderForeigner(d) {
+  const f = d.foreigner || {}, days = f.days || [], nats = f.top_nat || [];
+  make('cNat', {type: 'line', data: {labels: days.map(x => x.date.slice(5) + ' ' + x.wd),
+    datasets: nats.map(n => ({label: n, data: days.map(x => x.nat[n]), borderColor: NAT_COLOR[n] || css('--muted'), backgroundColor: NAT_COLOR[n] || css('--muted'), borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: .25}))},
+    options: baseOpts()});
+  table('tNat', ['날짜', '전체'].concat(nats), days.slice().reverse().map(x => [td(`${x.date} (${x.wd})`), td(fmt(x.total), 1)].concat(nats.map(n => td(fmt(x.nat[n]), 1)))));
+  document.getElementById('guRange').textContent = f.range7 ? `${f.range7} · 하루 평균 인원` : '';
+  const gu = (f.gu7 || []).slice(0, 12);
+  make('cGu', {type: 'bar', data: {labels: gu.map(g => g.gu), datasets: [{label: '하루 평균', data: gu.map(g => g.avg), backgroundColor: css('--seq'), borderRadius: {topRight: 4, bottomRight: 4}, borderSkipped: 'left', maxBarThickness: 18}]},
+    options: baseOpts({indexAxis: 'y', interaction: {mode: 'nearest', axis: 'y', intersect: false}, plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => ` 하루 평균 ${fmt(c.parsed.x)}명`}}},
+      scales: {x: {ticks: {color: css('--ink2'), callback: v => fmt(v)}, grid: {color: css('--grid')}, border: {display: false}}, y: {ticks: {color: css('--ink2')}, grid: {display: false}}}})});
+}
+
+function renderEvents(d) {
+  const e = d.events;
+  if (!e) { table('tEv', ['행사'], []); document.getElementById('webCard').style.display = 'none'; return; }
+  document.getElementById('evTiles').innerHTML = tile('기준 날짜', esc(e.date.slice(5)), e.date.slice(0, 4)) +
+    (e.counts || []).map(c => tile(esc(c.src), fmt(c.n) + '건')).join('');
+  table('tEv', ['종류', '행사', '장소', '시간', '가까운 곳'], (e.list || []).map(x =>
+    [td(`<span class="pill">${esc(x.kind || x.src)}</span>`), td(link(x.link, x.name)), td(esc([x.gu, x.place].filter(Boolean).join(' · '))), td(esc(x.time)), td(esc(x.near))]));
+  const w = e.web || [];
+  if (!w.length) { document.getElementById('webCard').style.display = 'none'; return; }
+  table('tWeb', ['종류', '행사', '장소', '시작', '확인'], w.map(x =>
+    [td(`<span class="pill">${esc(x.kind)}</span>`), td(link(x.link, x.name)), td(esc(x.place)), td(esc(x.start)), td(esc(x.level))]));
+}
+
+function renderFx(d) {
+  const fx = d.exchange || [];
+  const one = (id, key, label) => make(id, {type: 'line', data: {labels: fx.map(x => x.date.slice(2)),
+    datasets: [{label, data: fx.map(x => x[key] || null), borderColor: css('--seq'), borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: .2}]},
+    options: baseOpts({plugins: {legend: {display: false}, title: {display: true, text: label, color: css('--ink'), align: 'start', font: {size: 13, weight: '600'}},
+      tooltip: {callbacks: {label: c => ` ${label}: ${c.parsed.y.toLocaleString('ko-KR', {maximumFractionDigits: 2})}원`}}},
+      scales: {x: {ticks: {color: css('--ink2'), maxRotation: 0, maxTicksLimit: 5}, grid: {display: false}}, y: {ticks: {color: css('--ink2')}, grid: {color: css('--grid')}, border: {display: false}}}})});
+  one('cUSD', 'USD', '1달러'); one('cJPY', 'JPY100', '100엔'); one('cCNY', 'CNY', '1위안'); one('cTHB', 'THB', '1바트');
+  const lg = d.lodging || {}, log = lg.log || [];
+  const latest = {}; log.forEach(r => { latest[r.kind] = r; });
+  const sum = {}; log.forEach(r => { const s = sum[r.kind] || (sum[r.kind] = {new: 0, chg: 0, del: 0, from: r.date}); s.new += r.new; s.chg += r.chg; s.del += r.del; });
+  table('tLodge', ['종류', '영업 중', '전체(폐업 포함)', '기록 시작 후 신규', '변경', '삭제'], Object.keys(latest).map(k =>
+    [td(esc(k)), td(fmt(latest[k].open), 1), td(fmt(latest[k].total), 1), td(fmt(sum[k].new), 1), td(fmt(sum[k].chg), 1), td(fmt(sum[k].del), 1)]));
+  table('tNew', ['날짜', '종류', '업소명', '자치구'], (lg.recent_new || []).map(x => [td(esc(x.date)), td(esc(x.kind)), td(esc(x.name)), td(esc(x.gu))]));
+}
+
+const done = new Set();
+function show(tab) {
+  document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
+  document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === tab));
+  if (window.DATA && !done.has(tab)) { done.add(tab); ({status: renderStatus, foreigner: renderForeigner, events: renderEvents, fx: renderFx})[tab](window.DATA); }
+  try { localStorage.setItem('tab', tab); } catch (e) {}
+}
+document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => show(b.dataset.tab)));
+
+fetch('site/data.json', {cache: 'no-store'}).then(r => r.json()).then(d => {
+  window.DATA = d;
+  document.getElementById('updated').textContent = `마지막 갱신 ${d.updated_at}`;
+  let t = 'status'; try { t = localStorage.getItem('tab') || 'status'; } catch (e) {}
+  show(document.getElementById(t) ? t : 'status');
+}).catch(err => { document.getElementById('updated').innerHTML = `<span class="err">데이터를 불러오지 못했습니다 (${esc(err.message)})</span>`; });
+</script>
+</body>
+</html>
