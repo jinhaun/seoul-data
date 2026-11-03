@@ -69,7 +69,8 @@ function Write-CsvBom([string]$path, $rows) {
 
 # CSV 뒤에 줄 추가 (파일이 없으면 제목 줄과 함께 새로 만듦)
 function Add-CsvRows([string]$path, $rows) {
-    $rows = @($rows); if ($rows.Count -eq 0) { return }
+    # List[object]를 @()로 감싸면 "Argument types do not match" 오류가 나서 하나씩 꺼내 배열로 만듦
+    $rows = @(foreach ($r in $rows) { $r }); if ($rows.Count -eq 0) { return }
     if (-not (Test-Path $path)) { Write-CsvBom $path $rows; return }
     $lines = @($rows | ConvertTo-Csv -NoTypeInformation | Select-Object -Skip 1)
     [IO.File]::AppendAllLines($path, [string[]]$lines, $Utf8)
