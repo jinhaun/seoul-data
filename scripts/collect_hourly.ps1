@@ -5,7 +5,15 @@
 
 . "$PSScriptRoot/common.ps1"
 
+# 멈추면 이유를 GitHub 알림(누구나 볼 수 있음)으로 남김. 인증키는 *** 로 가림
+function Hide-Key([string]$m) { if ($env:SEOUL_API_KEY) { $m = $m.Replace($env:SEOUL_API_KEY.Trim(), '***') }; return $m }
+trap {
+    Write-Host ("::error::수집 중단: " + (Hide-Key "$($_.Exception.Message) (collect_hourly.ps1 $($_.InvocationInfo.ScriptLineNumber)번째 줄)"))
+    exit 1
+}
+
 $key  = Get-ApiKey
+if ($env:GITHUB_ACTIONS) { Write-Host "::notice::인증키 확인 (길이 $($key.Length)자)" }
 $now  = Get-KstNow
 $collected = $now.ToString('yyyy-MM-dd HH:mm')
 $spots = @(Get-Hotspots)
@@ -24,7 +32,9 @@ foreach ($s in $spots) {
         $rawParts.Add($text)
     } catch {
         $failed.Add($name)
-        Write-Host "실패: $name - $($_.Exception.Message)"
+        $msg = Hide-Key "$($_.Exception.Message)"
+        Write-Host "실패: $name - $msg"
+        if ($failed.Count -le 3 -and $env:GITHUB_ACTIONS) { Write-Host "::warning::장소 실패 ($name): $msg" }
     }
 }
 
