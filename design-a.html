@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>서울, 매시간</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700;900&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --paper:#f4f1ea;--ink:#161513;--ink2:#4a4741;--muted:#86827a;--rule:#d8d2c4;--soft:#e9e4d8;--accent:#c8102e;
+  --c1:#2e9e5b;--c2:#d9a404;--c3:#ee7a1f;--c4:#d7263d;
+  --serif:"Noto Serif KR",serif;--sans:"IBM Plex Sans KR",-apple-system,"Malgun Gothic",sans-serif;--mono:"IBM Plex Mono","IBM Plex Sans KR",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--paper:#151412;--ink:#ece8df;--ink2:#c3beb3;--muted:#8d887e;--rule:#34312b;--soft:#211f1b;--accent:#ff5a64}}
+:root[data-theme="dark"]{--paper:#151412;--ink:#ece8df;--ink2:#c3beb3;--muted:#8d887e;--rule:#34312b;--soft:#211f1b;--accent:#ff5a64}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.65 var(--sans);font-feature-settings:"tnum"}
+a{color:inherit;text-decoration-color:var(--accent);text-underline-offset:3px}
+.page{max-width:1120px;margin:0 auto;padding:0 24px 80px}
+.mast{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:2px solid var(--ink);padding:18px 0 10px;font:500 12px/1.4 var(--mono);letter-spacing:.02em}
+.mast .live::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:7px;vertical-align:1px}
+.mast nav a{margin-left:18px;text-decoration:none;color:var(--ink2)}
+.mast nav a:hover{color:var(--ink)}
+.hero{padding:56px 0 36px;border-bottom:1px solid var(--rule)}
+.kicker{font:500 13px var(--mono);color:var(--accent);letter-spacing:.08em}
+.hero h1{font:900 clamp(34px,5.6vw,68px)/1.18 var(--serif);letter-spacing:-.02em;margin:14px 0 0;max-width:17em;word-break:keep-all}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero p.lede{font-size:18px;color:var(--ink2);max-width:40em;margin:22px 0 0;word-break:keep-all}
+.facts{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--rule)}
+.fact{padding:22px 20px 22px 0;border-right:1px solid var(--rule)}
+.fact+.fact{padding-left:20px}.fact:last-child{border-right:0}
+.fact .k{font:500 13px var(--sans);color:var(--muted)}
+.fact .v{font:700 clamp(26px,3.2vw,38px)/1.15 var(--serif);margin-top:6px}
+.fact .v small{font:500 15px var(--sans);color:var(--ink2);margin-left:3px}
+.fact .s{font-size:13px;color:var(--muted);margin-top:4px}
+section{padding:64px 0 8px;border-bottom:1px solid var(--rule)}
+.sh{display:grid;grid-template-columns:90px 1fr;gap:0 18px;margin-bottom:28px}
+.sh .no{font:700 44px/1 var(--serif);color:var(--accent)}
+.sh h2{font:700 30px/1.25 var(--serif);margin:0;letter-spacing:-.01em;word-break:keep-all}
+.sh p{grid-column:2;color:var(--ink2);margin:8px 0 0;max-width:44em;word-break:keep-all}
+.cols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:40px;align-items:start}
+.cap{font:400 12.5px var(--sans);color:var(--muted);margin:10px 0 0}
+.mapbox{position:relative;width:100%;aspect-ratio:1.18/1;background:var(--soft);border-radius:2px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--ink2);margin:12px 0 0}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.legend.line i{border-radius:1px;height:3px;width:16px;vertical-align:3px}
+ol.rank{list-style:none;margin:0;padding:0;counter-reset:r}
+ol.rank li{counter-increment:r;display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--rule)}
+ol.rank li::before{content:counter(r,decimal-leading-zero);font:500 12px var(--mono);color:var(--muted)}
+ol.rank .nm{font-weight:600;word-break:keep-all}
+ol.rank .nm span{display:block;font-weight:400;font-size:13px;color:var(--muted)}
+ol.rank .n{font:700 17px var(--serif);text-align:right;white-space:nowrap}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:1px}
+.chart{position:relative;height:300px}.chart.tall{height:380px}.chart.sm{height:170px}
+.bars{margin:0;padding:0;list-style:none}
+.bars li{display:grid;grid-template-columns:84px 1fr 70px;gap:12px;align-items:center;padding:5px 0;font-size:14px}
+.bars .b{height:10px;background:var(--soft);border-radius:0 2px 2px 0;position:relative}
+.bars .b span{position:absolute;inset:0 auto 0 0;background:var(--ink);border-radius:0 2px 2px 0}
+.bars li:first-child .b span{background:var(--accent)}
+.bars .n{text-align:right;font-family:var(--mono);font-size:13px;color:var(--ink2)}
+.events{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 40px}
+.ev{padding:14px 0;border-top:1px solid var(--rule)}
+.ev .meta{font:600 12.5px var(--sans);color:var(--accent)}
+.ev .t{font:700 18px/1.4 var(--serif);margin:4px 0;word-break:keep-all}
+.ev .t a{text-decoration:none}.ev .t a:hover{text-decoration:underline}
+.ev .w{font-size:13.5px;color:var(--ink2)}
+.small4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px}
+.fxh{font:500 13px var(--sans);color:var(--muted)}
+.fxv{font:700 24px var(--serif);margin:2px 0 4px}
+.fxd{font-size:13px}.up{color:var(--accent)}.down{color:var(--c1)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:9px 8px 9px 0;border-bottom:1px solid var(--rule);text-align:left;vertical-align:top}
+th{font:500 12.5px var(--sans);color:var(--muted)}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+details{margin-top:14px}details summary{cursor:pointer;font:500 13px var(--mono);color:var(--ink2)}
+.tbl{overflow-x:auto}
+.dl{display:grid;grid-template-columns:repeat(3,1fr);gap:0 40px}
+.dl a{display:block;padding:12px 0;border-top:1px solid var(--rule);text-decoration:none}
+.dl a b{display:block;font:700 17px var(--serif)}.dl a span{font-size:13px;color:var(--muted)}
+.dl a:hover b{color:var(--accent)}
+footer{padding:36px 0 0;font-size:13px;color:var(--muted);line-height:1.8;max-width:56em}
+@media (max-width:860px){
+  .page{padding:0 16px 60px}
+  .facts{grid-template-columns:1fr 1fr}.fact:nth-child(2){border-right:0}.fact:nth-child(3){padding-left:0}.fact:nth-child(n+3){border-top:1px solid var(--rule)}
+  .cols,.events,.dl{grid-template-columns:1fr}.small4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sh{grid-template-columns:52px 1fr}.sh .no{font-size:32px}.sh h2{font-size:24px}
+  .mast nav{display:none}section{padding-top:44px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="mast">
+    <div><span class="live" id="mBase">서울 · 매시간 기록</span></div>
+    <nav><a href="#now">지금</a><a href="#flow">흐름</a><a href="#foreigner">외국인</a><a href="#events">행사</a><a href="#fx">환율·숙소</a><a href="#data">자료</a></nav>
+  </header>
+
+  <div class="hero">
+    <div class="kicker">SEOUL, EVERY HOUR</div>
+    <h1 id="headline">서울을 매시간 기록합니다.</h1>
+    <p class="lede">서울시가 공개하는 121곳의 실시간 인구, 외국인 생활인구, 오늘의 행사, 환율과 숙소 변화를 한 시간마다 자동으로 모아 둡니다. 노트북 없이 GitHub에서 돌아갑니다.</p>
+  </div>
+  <div class="facts" id="facts"></div>
+
+  <section id="now">
+    <div class="sh"><div class="no">01</div><h2>지금의 서울</h2><p id="nowNote">121곳의 혼잡도. 점이 클수록 사람이 많습니다.</p></div>
+    <div class="cols">
+      <div>
+        <div class="mapbox"><canvas id="cMap"></canvas></div>
+        <div class="legend" id="lvlLegend"></div>
+      </div>
+      <div><ol class="rank" id="rank"></ol><p class="cap">인구는 서울시 추정 범위의 최댓값</p></div>
+    </div>
+  </section>
+
+  <section id="flow">
+    <div class="sh"><div class="no">02</div><h2>하루의 리듬</h2><p>121곳 인구를 모두 더한 값의 최근 7일. 출근 시간에 오르고 밤에 내려갑니다. 같은 사람이 여러 장소에 겹쳐 잡힐 수 있어 서울 전체 인구와는 다릅니다.</p></div>
+    <div class="chart"><canvas id="cFlow"></canvas></div>
+  </section>
+
+  <section id="foreigner">
+    <div class="sh"><div class="no">03</div><h2>서울을 찾은 외국인</h2><p id="fNote">단기체류 외국인 생활인구, 올해 1월 1일부터. 하루 평균 인원의 7일 평균입니다. 서울시 공개가 약 4일 늦습니다.</p></div>
+    <div class="chart tall"><canvas id="cNat"></canvas></div>
+    <div class="legend line" id="natLegend"></div>
+    <div class="cols" style="margin-top:44px">
+      <div><h3 style="font:700 19px var(--serif);margin:0 0 12px">어느 구에 머무나</h3><ul class="bars" id="guBars"></ul><p class="cap" id="guCap"></p></div>
+      <div><h3 style="font:700 19px var(--serif);margin:0 0 12px">국적별, 가장 최근 하루</h3><div class="tbl"><table id="tNatNow"></table></div>
+        <details><summary>날짜별 전체 표</summary><div class="tbl"><table id="tNat"></table></div></details></div>
+    </div>
+  </section>
+
+  <section id="events">
+    <div class="sh"><div class="no">04</div><h2>오늘의 행사</h2><p id="evNote">서울시 공식 자료 중 사람이 몰리는 행사. 가까운 곳은 121곳 중 가장 가까운 장소입니다.</p></div>
+    <div class="events" id="evList"></div>
+  </section>
+
+  <section id="fx">
+    <div class="sh"><div class="no">05</div><h2>환율과 숙소</h2><p>여행 비용을 가늠하는 원화 환율(최근 120 고시일, ECB 기준)과 서울 숙박업소의 변화.</p></div>
+    <div class="small4" id="fxBox"></div>
+    <div class="cols" style="margin-top:44px">
+      <div><h3 style="font:700 19px var(--serif);margin:0 0 12px">숙소 현황</h3><div class="tbl"><table id="tLodge"></table></div></div>
+      <div><h3 style="font:700 19px var(--serif);margin:0 0 12px">최근 새로 생긴 숙소</h3><div class="tbl"><table id="tNew"></table></div></div>
+    </div>
+  </section>
+
+  <section id="data">
+    <div class="sh"><div class="no">06</div><h2>기록과 자료</h2><p>하루 24번(1시간마다)이 정상입니다. 11월 초까지는 노트북에서 30분마다 모았습니다.</p></div>
+    <div class="chart sm"><canvas id="cStatus"></canvas></div>
+    <div class="dl" style="margin-top:32px">
+      <a href="https://github.com/jinhaun/seoul-data/tree/main/data/realtime"><b>실시간 121곳</b><span>날짜별 CSV · 혼잡도·인구·연령·날씨·교통</span></a>
+      <a href="https://github.com/jinhaun/seoul-data/tree/main/data/foreigner"><b>외국인 생활인구</b><span>단기·장기 · 자치구 × 시간 × 국적</span></a>
+      <a href="https://github.com/jinhaun/seoul-data/tree/main/data/events"><b>행사</b><span>공식 자료 · 웹 확인</span></a>
+      <a href="https://github.com/jinhaun/seoul-data/tree/main/data/lodging"><b>숙박</b><span>현재 목록 · 날짜별 변경</span></a>
+      <a href="https://github.com/jinhaun/seoul-data/tree/main/data/exchange"><b>환율</b><span>일별 CSV</span></a>
+      <a href="https://github.com/jinhaun/seoul-data/archive/refs/heads/main.zip"><b>전체 내려받기</b><span>zip 한 번에</span></a>
+    </div>
+  </section>
+
+  <footer>
+    출처 — 서울 열린데이터광장(공공누리 제1유형): 서울시 실시간 도시데이터, 외국인 생활인구, 문화행사 정보, 교통통제 정보, 숙박업 인허가 정보. 서울시설공단 공연장 일정. 환율 European Central Bank(Frankfurter API).<br>
+    <span id="upd"></span>
+  </footer>
+</div>
+
+<script>
+const NAT_COLOR = {'미국':'#2a78d6','인도':'#eb6834','일본':'#1baf7a','중국':'#eda100','태국':'#e87ba4','프랑스':'#6250d6',
+  '대만':'#16a3b8','베트남':'#9a6a2f','필리핀':'#c2410c','몽골':'#0f766e','러시아':'#7c3aed','홍콩':'#64748b','캐나다':'#be123c'};
+const LVL = ['여유', '보통', '약간 붐빔', '붐빔'];
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const lvlColor = l => css('--c' + (LVL.indexOf(l) + 1)) || css('--muted');
+const fmt = n => (n == null || isNaN(n)) ? '–' : Math.round(n).toLocaleString('ko-KR');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const link = (h, t) => /^https?:\/\//.test(h || '') ? `<a href="${esc(h)}" target="_blank" rel="noopener">${esc(t)}</a>` : esc(t);
+const dot = s => s.replace(/-/g, '.');
+const man = n => n >= 10000 ? (n / 10000).toFixed(n >= 100000 ? 0 : 1).replace(/\.0$/, '') + '만' : fmt(n);
+const ma7 = a => a.map((_, i) => { const w = a.slice(Math.max(0, i - 6), i + 1).filter(v => v != null); return w.length ? w.reduce((x, y) => x + y, 0) / w.length : null; });
+
+Chart.defaults.font.family = css('--sans');
+Chart.defaults.font.size = 12;
+function axes(extra = {}) {
+  const m = css('--muted'), r = css('--rule');
+  return Object.assign({responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: {mode: 'index', intersect: false},
+    plugins: {legend: {display: false}, tooltip: {backgroundColor: css('--ink'), titleColor: css('--paper'), bodyColor: css('--paper'), padding: 10, cornerRadius: 2, boxPadding: 4,
+      callbacks: {label: c => ` ${c.dataset.label}: ${fmt(c.parsed.y)}`}}},
+    scales: {x: {ticks: {color: m, maxRotation: 0, autoSkip: true, maxTicksLimit: 7}, grid: {display: false}, border: {color: css('--ink')}},
+             y: {ticks: {color: m, callback: v => man(v)}, grid: {color: r}, border: {display: false}}}}, extra);
+}
+
+function render(d) {
+  const now = d.now || {}, top = now.top || [], f = d.foreigner || {}, days = f.days || [], ev = d.events || {}, fx = d.exchange || [];
+  document.getElementById('mBase').textContent = now.base ? `${dot(now.base)} 기준 · 매시간 갱신` : '서울 · 매시간 기록';
+  document.getElementById('upd').textContent = `마지막 갱신 ${dot(d.updated_at || '')}`;
+
+  // 헤드라인
+  if (top[0]) {
+    const busy = (now.congest || []).find(c => c.lvl === '붐빔');
+    document.getElementById('headline').innerHTML = `지금 서울에서 사람이 가장 많은 곳은 <em>${esc(top[0].place)}</em>, 약 ${man(top[0].max)} 명.`;
+    if (busy) document.getElementById('nowNote').textContent = `${dot(now.base)} 기준, 121곳 중 ${busy.n}곳이 ‘붐빔’. 점이 클수록 사람이 많습니다.`;
+  }
+  const lastF = days[days.length - 1], firstF = days[0];
+  const usd = fx[fx.length - 1], usd30 = fx[Math.max(0, fx.length - 22)];
+  const evN = (ev.counts || []).reduce((a, c) => a + c.n, 0);
+  const lr = d.last_run;
+  document.getElementById('facts').innerHTML = [
+    ['수집 중인 장소', lr ? `${lr.ok}<small>/ 121곳</small>` : '–', lr ? `마지막 ${dot(lr.at.slice(5))}` : ''],
+    ['단기체류 외국인', lastF ? `${man(lastF.total)}<small>명</small>` : '–', lastF ? `${dot(lastF.date.slice(5))} 하루 평균` : ''],
+    ['오늘의 행사', evN ? `${fmt(evN)}<small>건</small>` : '–', ev.date ? `${dot(ev.date.slice(5))} 서울시 공식` : ''],
+    ['1달러', usd ? `${fmt(usd.USD)}<small>원</small>` : '–', usd && usd30 ? `한 달 전보다 ${usd.USD >= usd30.USD ? '+' : ''}${fmt(usd.USD - usd30.USD)}원` : '']
+  ].map(([k, v, s]) => `<div class="fact"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
+
+  // 01 지도
+  const all = now.all || [];
+  const maxPop = Math.max(...all.map(a => a.max), 1);
+  const labelTop = new Set(top.slice(0, 4).map(t => t.place));
+  new Chart(document.getElementById('cMap'), {type: 'scatter',
+    data: {datasets: [{data: all.slice().sort((a, b) => b.max - a.max).map(a => ({x: a.lng, y: a.lat, a})),
+      pointRadius: c => 3 + 15 * Math.sqrt((c.raw?.a.max || 0) / maxPop), pointHoverRadius: c => 5 + 15 * Math.sqrt((c.raw?.a.max || 0) / maxPop),
+      backgroundColor: c => lvlColor(c.raw?.a.lvl) + 'cc', borderColor: css('--paper'), borderWidth: 1.5}]},
+    options: {responsive: true, maintainAspectRatio: false, animation: false, layout: {padding: 8},
+      plugins: {legend: {display: false}, tooltip: {backgroundColor: css('--ink'), titleColor: css('--paper'), bodyColor: css('--paper'), cornerRadius: 2, padding: 10, displayColors: false,
+        callbacks: {title: i => i[0].raw.a.p, label: i => [`${i.raw.a.lvl} · 약 ${fmt(i.raw.a.max)}명`, i.raw.a.c]}}},
+      scales: {x: {display: false, min: 126.78, max: 127.18}, y: {display: false, min: 37.42, max: 37.69}}},
+    plugins: [{id: 'labels', afterDatasetsDraw(ch) {
+      const ctx = ch.ctx; ctx.save(); ctx.font = `600 12px ${css('--sans')}`; ctx.fillStyle = css('--ink'); ctx.textBaseline = 'middle';
+      ch.getDatasetMeta(0).data.forEach((pt, i) => { const a = ch.data.datasets[0].data[i].a; if (labelTop.has(a.p)) ctx.fillText(a.p.replace(/ 관광특구$/, ''), pt.x + pt.options.radius + 4, pt.y); });
+      ctx.restore(); }}]});
+  document.getElementById('lvlLegend').innerHTML = LVL.map(l => { const n = (now.congest || []).find(c => c.lvl === l); return `<span><i style="background:${lvlColor(l)}"></i>${l} ${n ? n.n + '곳' : ''}</span>`; }).join('');
+  document.getElementById('rank').innerHTML = top.slice(0, 10).map(t =>
+    `<li><div class="nm">${esc(t.place)}<span><i class="dot" style="background:${lvlColor(t.lvl)}"></i>${esc(t.lvl)}${t.temp ? ' · ' + esc(t.temp) + '℃' : ''}</span></div><div class="n">${man(t.max)}</div></li>`).join('');
+
+  // 02 흐름
+  const fl = d.flow || [];
+  new Chart(document.getElementById('cFlow'), {type: 'line', data: {labels: fl.map(x => x.t.slice(5).replace('-', '.')),
+    datasets: [{label: '121곳 합계', data: fl.map(x => x.pop), borderColor: css('--ink'), borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: .3,
+      fill: true, backgroundColor: css('--soft')}]}, options: axes()});
+
+  // 03 외국인
+  const nats = f.top_nat || [];
+  new Chart(document.getElementById('cNat'), {type: 'line', data: {labels: days.map(x => dot(x.date.slice(5))),
+    datasets: nats.map(n => ({label: n, data: ma7(days.map(x => x.nat[n] ?? null)), borderColor: NAT_COLOR[n] || css('--muted'), backgroundColor: NAT_COLOR[n] || css('--muted'),
+      borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: .3}))},
+    options: axes({scales: {x: {ticks: {color: css('--muted'), maxRotation: 0, autoSkip: true, maxTicksLimit: 11}, grid: {display: false}, border: {color: css('--ink')}},
+      y: {ticks: {color: css('--muted'), callback: v => man(v)}, grid: {color: css('--rule')}, border: {display: false}}}})});
+  document.getElementById('natLegend').innerHTML = nats.map(n => `<span><i style="background:${NAT_COLOR[n] || css('--muted')}"></i>${esc(n)}</span>`).join('');
+  if (firstF && lastF) document.getElementById('fNote').textContent = `단기체류 외국인 생활인구, ${dot(firstF.date)} ~ ${dot(lastF.date)}. 하루 평균 인원의 7일 평균입니다. 서울시 공개가 약 4일 늦습니다.`;
+  const gu = (f.gu7 || []).slice(0, 10), guMax = Math.max(...gu.map(g => g.avg), 1);
+  document.getElementById('guBars').innerHTML = gu.map(g => `<li><span>${esc(g.gu)}</span><div class="b"><span style="width:${(g.avg / guMax * 100).toFixed(1)}%"></span></div><span class="n">${fmt(g.avg)}</span></li>`).join('');
+  document.getElementById('guCap').textContent = f.range7 ? `${dot(f.range7)} · 하루 평균 인원` : '';
+  if (lastF) {
+    const prev = days[Math.max(0, days.length - 8)];
+    document.getElementById('tNatNow').innerHTML = `<thead><tr><th>국적</th><th class="n">${dot(lastF.date.slice(5))}</th><th class="n">일주일 전보다</th></tr></thead><tbody>` +
+      nats.map(n => { const v = lastF.nat[n], p = prev.nat[n], dv = v - p; return `<tr><td><i class="dot" style="background:${NAT_COLOR[n] || css('--muted')}"></i>${esc(n)}</td><td class="n">${fmt(v)}</td><td class="n ${dv > 0 ? 'up' : 'down'}">${dv > 0 ? '+' : ''}${fmt(dv)}</td></tr>`; }).join('') + '</tbody>';
+    document.getElementById('tNat').innerHTML = `<thead><tr><th>날짜</th><th class="n">전체</th>${nats.map(n => `<th class="n">${esc(n)}</th>`).join('')}</tr></thead><tbody>` +
+      days.slice().reverse().map(x => `<tr><td>${dot(x.date)} ${x.wd}</td><td class="n">${fmt(x.total)}</td>${nats.map(n => `<td class="n">${fmt(x.nat[n])}</td>`).join('')}</tr>`).join('') + '</tbody>';
+  }
+
+  // 04 행사
+  const list = (ev.list || []).slice(0, 16);
+  if (ev.date) document.getElementById('evNote').textContent = `${dot(ev.date)} · 서울시 공식 자료 ${fmt(evN)}건 중 사람이 몰리는 행사. 가까운 곳은 121곳 중 가장 가까운 장소입니다.`;
+  document.getElementById('evList').innerHTML = list.length ? list.map(x =>
+    `<div class="ev"><div class="meta">${esc(x.kind || x.src)}${x.near ? ' · ' + esc(x.near) + ' 근처' : ''}</div><div class="t">${link(x.link, x.name)}</div><div class="w">${esc([x.gu, x.place].filter(Boolean).join(' · '))}${x.time ? ' · ' + esc(x.time) : ''}</div></div>`).join('')
+    : '<p style="color:var(--muted)">아직 자료가 없습니다.</p>';
+
+  // 05 환율·숙소
+  const cur = [['USD', '1달러'], ['JPY100', '100엔'], ['CNY', '1위안'], ['THB', '1바트']];
+  document.getElementById('fxBox').innerHTML = cur.map(([k, l]) => {
+    const a = fx[fx.length - 1]?.[k], b = fx[Math.max(0, fx.length - 22)]?.[k], dv = a - b, pct = b ? dv / b * 100 : 0;
+    return `<div><div class="fxh">${l}</div><div class="fxv">${a ? a.toLocaleString('ko-KR', {maximumFractionDigits: 2}) : '–'}원</div><div class="fxd ${dv > 0 ? 'up' : 'down'}">한 달 ${dv > 0 ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)}%</div><div class="chart sm" style="height:90px;margin-top:8px"><canvas id="fx${k}"></canvas></div></div>`;
+  }).join('');
+  cur.forEach(([k, l]) => new Chart(document.getElementById('fx' + k), {type: 'line', data: {labels: fx.map(x => dot(x.date)),
+    datasets: [{label: l, data: fx.map(x => x[k] || null), borderColor: css('--ink'), borderWidth: 1.5, pointRadius: 0, pointHoverRadius: 3, tension: .2}]},
+    options: axes({plugins: {legend: {display: false}, tooltip: {backgroundColor: css('--ink'), titleColor: css('--paper'), bodyColor: css('--paper'), cornerRadius: 2, displayColors: false,
+      callbacks: {label: c => `${l} ${c.parsed.y.toLocaleString('ko-KR', {maximumFractionDigits: 2})}원`}}}, scales: {x: {display: false}, y: {display: false}}})}));
+  const log = d.lodging?.log || [], latest = {}, sum = {};
+  log.forEach(r => { latest[r.kind] = r; const s = sum[r.kind] || (sum[r.kind] = {new: 0, del: 0}); s.new += r.new; s.del += r.del; });
+  document.getElementById('tLodge').innerHTML = '<thead><tr><th>종류</th><th class="n">영업 중</th><th class="n">기록 후 신규</th><th class="n">폐업·삭제</th></tr></thead><tbody>' +
+    Object.keys(latest).map(k => `<tr><td>${esc(k)}</td><td class="n">${fmt(latest[k].open)}</td><td class="n">${fmt(sum[k].new)}</td><td class="n">${fmt(sum[k].del)}</td></tr>`).join('') + '</tbody>';
+  document.getElementById('tNew').innerHTML = '<thead><tr><th>날짜</th><th>숙소</th><th>구</th></tr></thead><tbody>' +
+    (d.lodging?.recent_new || []).slice(0, 10).map(x => `<tr><td style="white-space:nowrap">${dot(x.date.slice(5))}</td><td>${esc(x.name)} <span style="color:var(--muted);font-size:12px">${esc(x.kind)}</span></td><td>${esc(x.gu)}</td></tr>`).join('') + '</tbody>';
+
+  // 06 기록
+  const st = d.status || [];
+  new Chart(document.getElementById('cStatus'), {type: 'bar', data: {labels: st.map(s => dot(s.date.slice(5))),
+    datasets: [{label: '수집 횟수', data: st.map(s => s.snaps), backgroundColor: css('--ink'), borderRadius: {topLeft: 2, topRight: 2}, borderSkipped: 'bottom', maxBarThickness: 14}]},
+    options: axes({scales: {x: {ticks: {color: css('--muted'), maxRotation: 0, maxTicksLimit: 10}, grid: {display: false}, border: {color: css('--ink')}}, y: {ticks: {color: css('--muted'), stepSize: 24}, grid: {color: css('--rule')}, border: {display: false}}}})});
+}
+
+fetch('site/data.json', {cache: 'no-store'}).then(r => r.json()).then(render)
+  .catch(e => { document.getElementById('headline').textContent = '자료를 불러오지 못했습니다.'; console.error(e); });
+</script>
+</body>
+</html>

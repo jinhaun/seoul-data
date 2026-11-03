@@ -47,27 +47,44 @@ if ($latestRows.Count) {
         congest = @($snap | Group-Object '혼잡도' | ForEach-Object { [ordered]@{ lvl = $_.Name; n = $_.Count } })
         top = @($snap | Sort-Object { Num $_.'인구_최대' } -Descending | Select-Object -First 15 | ForEach-Object { [ordered]@{ place = $_.'장소'; lvl = $_.'혼잡도'; min = [int](Num $_.'인구_최소'); max = [int](Num $_.'인구_최대'); temp = $_.'기온' } })
     }
+    # 지도용: 121곳 전부 (위도·경도·혼잡도·인구)
+    $metaPath = Join-Path $RepoRoot 'data/meta/장소_121곳.csv'
+    $spots = @(if (Test-Path $metaPath) { Read-Csv $metaPath } else { Get-Hotspots })
+    $geo = @{}; foreach ($s in $spots) { $geo[$s.'장소'] = $s }
+    $out.now.all = @($snap | Where-Object { $geo[$_.'장소'] } | ForEach-Object {
+        $g = $geo[$_.'장소']
+        [ordered]@{ p = $_.'장소'; c = $g.'분류'; lvl = $_.'혼잡도'; max = [int](Num $_.'인구_최대'); lat = [Math]::Round([decimal](Num $g.'위도'), 5); lng = [Math]::Round([decimal](Num $g.'경도'), 5) }
+    })
 }
 
-# ---------------- 외국인 동향 (단기체류, 최근 60일)
-$fFiles = Days-Back 'foreigner/단기' 60
-$natTotals = New-Object System.Collections.Generic.List[object]
-$guAcc = @{}; $guDays = 0
+# ---------------- 외국인 동향 (단기체류, 올해 1월 1일부터)
+$fFiles = @(Days-Back 'foreigner/단기' 400 | Where-Object { $_.BaseName -ge "$($now.Year)-01-01" })
 $skip = @('날짜', '시간', '자치구코드', '자치구', '생활인구합계')
-$natSum = @{}
+# 날짜마다 한 번만 계산해서 일별요약 표에 쌓아 둠 (매번 300일치를 다시 읽지 않게)
+$sumPath = Join-Path $RepoRoot 'data/foreigner/일별요약_단기.csv'
+$summary = @{}; foreach ($s in (Read-Csv $sumPath)) { $summary[$s.'날짜'] = $s }
+$added = 0
 foreach ($f in $fFiles) {
+    if ($summary.ContainsKey($f.BaseName)) { continue }
     $rows = @(Read-Csv $f.FullName); if (-not $rows.Count) { continue }
-    $nats = @($rows[0].PSObject.Properties.Name | Where-Object { $_ -notin $skip })
-    $day = [ordered]@{ date = $f.BaseName; wd = (Get-WeekdayKo ([datetime]::ParseExact($f.BaseName, 'yyyy-MM-dd', $null))); total = 0.0 }
-    $tot = 0.0; foreach ($r in $rows) { $tot += (Num $r.'생활인구합계') }; $day.total = [int]($tot / 24)
-    $byNat = [ordered]@{}
-    foreach ($n in $nats) { $s = 0.0; foreach ($r in $rows) { $s += (Num $r.$n) }; $byNat[$n] = [int]($s / 24); $natSum[$n] = [double]$natSum[$n] + $s }
-    $day.nat = $byNat
-    $natTotals.Add($day)
-    if ($f -in @($fFiles | Select-Object -Last 7)) {
-        $guDays++
-        foreach ($r in $rows) { $guAcc[$r.'자치구'] = [double]$guAcc[$r.'자치구'] + (Num $r.'생활인구합계') }
-    }
+    $o = [ordered]@{ '날짜' = $f.BaseName }
+    $tot = 0.0; foreach ($r in $rows) { $tot += (Num $r.'생활인구합계') }; $o['합계'] = [int]($tot / 24)
+    foreach ($n in @($rows[0].PSObject.Properties.Name | Where-Object { $_ -notin $skip })) { $s = 0.0; foreach ($r in $rows) { $s += (Num $r.$n) }; $o[$n] = [int]($s / 24) }
+    $summary[$f.BaseName] = [pscustomobject]$o; $added++
+}
+if ($added) { Write-CsvBom $sumPath @($summary.Keys | Sort-Object | ForEach-Object { $summary[$_] }) }
+$natTotals = New-Object System.Collections.Generic.List[object]
+$natSum = @{}
+foreach ($k in ($summary.Keys | Where-Object { $_ -ge "$($now.Year)-01-01" } | Sort-Object)) {
+    $s = $summary[$k]; $byNat = [ordered]@{}
+    foreach ($n in @($s.PSObject.Properties.Name | Where-Object { $_ -notin @('날짜', '합계') })) { $byNat[$n] = [int](Num $s.$n); $natSum[$n] = [double]$natSum[$n] + (Num $s.$n) }
+    $natTotals.Add([ordered]@{ date = $k; wd = (Get-WeekdayKo ([datetime]::ParseExact($k, 'yyyy-MM-dd', $null))); total = [int](Num $s.'합계'); nat = $byNat })
+}
+# 자치구는 최근 7일 원본만 읽음
+$guAcc = @{}; $guDays = 0
+foreach ($f in @($fFiles | Select-Object -Last 7)) {
+    $guDays++
+    foreach ($r in (Read-Csv $f.FullName)) { $guAcc[$r.'자치구'] = [double]$guAcc[$r.'자치구'] + (Num $r.'생활인구합계') }
 }
 $topNat = @($natSum.Keys | Where-Object { $_ -ne '기타' } | Sort-Object { $natSum[$_] } -Descending | Select-Object -First 6)
 # 상위 6개국만 담아서 용량 줄이기
