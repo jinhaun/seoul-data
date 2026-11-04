@@ -20,9 +20,11 @@ $collected = $now.ToString('yyyy-MM-dd HH:mm')
 function Set-Saved([string]$v) { if ($env:GITHUB_OUTPUT) { "saved=$v" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8 } }
 function Get-DayFile([datetime]$d) { Join-Path $RepoRoot ("data/realtime/" + (Get-DayPath $d) + '.csv') }
 function Test-SlotSaved([string]$slot) {
-    # slot = 'yyyy-MM-dd HH' : 그 시간대 자료가 이미 표에 있는지
-    $f = Get-DayFile ([datetime]::ParseExact($slot.Substring(0, 10), 'yyyy-MM-dd', $null))
-    return @(Read-Csv $f | Where-Object { "$($_.'인구기준시각')".StartsWith($slot) } | Select-Object -First 1).Count -gt 0
+    # slot = 'yyyy-MM-dd HH' : 그 시간대 묶음을 이미 저장했는지.
+    # 표의 줄이 아니라 수집기록(묶음의 대표 기준시각)으로 판단함.
+    # 서울시가 갱신하는 순간 받으면 13:55·14:00이 한 묶음에 섞이는데, 줄로 보면 14시를 이미 받은 것처럼 보이기 때문.
+    return @(Read-Csv (Join-Path $RepoRoot 'data/status/수집기록.csv') |
+        Where-Object { "$($_.'인구기준시각')".StartsWith($slot) -and [int]"0$($_.'성공')" -gt 0 } | Select-Object -First 1).Count -gt 0
 }
 Set-Saved 'false'
 
