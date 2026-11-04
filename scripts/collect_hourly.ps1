@@ -1,6 +1,7 @@
-﻿# 1시간마다: 서울 실시간 도시데이터 121곳을 받아 저장합니다. (GitHub Actions에서 매시 33분쯤 실행)
-#  - data/realtime/YYYY-MM/YYYY-MM-DD.csv   : 장소별 요약 한 줄씩 (같은 인구기준시각은 한 번만)
-#  - data/status/수집기록.csv               : 실행마다 성공/실패 기록
+﻿# 서울 실시간 도시데이터 121곳을 1시간에 한 번씩 저장합니다.
+# GitHub이 예약 실행을 자주 건너뛰어서 10분마다 시도하고, 그 시간대(인구기준시각의 '시')가 이미 저장돼 있으면 바로 끝냅니다.
+#  - data/realtime/YYYY-MM/YYYY-MM-DD.csv   : 장소별 요약 한 줄씩 (한 시간대에 한 묶음만)
+#  - data/status/수집기록.csv               : 저장한 실행마다 성공/실패 기록
 #  - tmp/raw/YYYY-MM-DD_HHmm.json.gz        : 원본 (워크플로가 Releases에 보관하고 저장소에는 넣지 않음)
 
 . "$PSScriptRoot/common.ps1"
@@ -16,8 +17,25 @@ $key  = Get-ApiKey
 if ($env:GITHUB_ACTIONS) { Write-Host "::notice::인증키 확인 (길이 $($key.Length)자)" }
 $now  = Get-KstNow
 $collected = $now.ToString('yyyy-MM-dd HH:mm')
+function Set-Saved([string]$v) { if ($env:GITHUB_OUTPUT) { "saved=$v" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8 } }
+function Get-DayFile([datetime]$d) { Join-Path $RepoRoot ("data/realtime/" + (Get-DayPath $d) + '.csv') }
+function Test-SlotSaved([string]$slot) {
+    # slot = 'yyyy-MM-dd HH' : 그 시간대 자료가 이미 표에 있는지
+    $f = Get-DayFile ([datetime]::ParseExact($slot.Substring(0, 10), 'yyyy-MM-dd', $null))
+    return @(Read-Csv $f | Where-Object { "$($_.'인구기준시각')".StartsWith($slot) } | Select-Object -First 1).Count -gt 0
+}
+Set-Saved 'false'
+
 $spots = @(Get-Hotspots)
 if ($spots.Count -eq 0) { throw '장소 목록이 비어 있습니다.' }
+
+# 먼저 한 곳만 받아서 지금 자료가 몇 시 자료인지 확인
+$probe = Get-Text ("http://openapi.seoul.go.kr:8088/$key/json/citydata/1/5/" + [Uri]::EscapeDataString("$($spots[0].'장소')")) $null
+if ($probe -match '"PPLTN_TIME"\s*:\s*"(\d{4}-\d{2}-\d{2} \d{2}):\d{2}"') {
+    $slot = $Matches[1]
+    if (Test-SlotSaved $slot) { Write-Host "$($slot)시 자료는 이미 저장돼 있어서 끝냅니다."; exit 0 }
+    Write-Host "$($slot)시 자료가 없어서 121곳을 받습니다."
+}
 
 $rawParts = New-Object System.Collections.Generic.List[string]
 $rows     = New-Object System.Collections.Generic.List[object]
@@ -51,14 +69,15 @@ $status = [pscustomobject][ordered]@{
 }
 
 if ($rows.Count -gt 0) {
-    $dayFile = Join-Path $RepoRoot ("data/realtime/" + (Get-DayPath $stamp) + '.csv')
-    $already = @(Read-Csv $dayFile | Where-Object { $_.'인구기준시각' -eq $status.'인구기준시각' }).Count
-    if ($already -gt 0) {
-        Write-Host "이미 저장된 기준시각($($status.'인구기준시각')) 이라 표에는 추가하지 않음"
-    } else {
-        Add-CsvRows $dayFile $rows
-        Write-Host "저장: $dayFile (+$($rows.Count)줄)"
+    $dayFile = Get-DayFile $stamp
+    $slot = $stamp.ToString('yyyy-MM-dd HH')
+    if (Test-SlotSaved $slot) {
+        Write-Host "$($slot)시 자료가 이미 있어서 표에는 추가하지 않음"
+        exit 0
     }
+    Add-CsvRows $dayFile $rows
+    Set-Saved 'true'
+    Write-Host "저장: $dayFile (+$($rows.Count)줄)"
     # 원본
     $rawDir = Join-Path $RepoRoot 'tmp/raw'
     New-Item -ItemType Directory -Force -Path $rawDir | Out-Null

@@ -2,7 +2,9 @@ name: 실시간 수집 (1시간마다)
 
 on:
   schedule:
-    - cron: '33 * * * *'   # 매시 33분 (서울시 인구 데이터가 약 30분 늦게 올라와서 정각 기준 데이터를 받음)
+    # GitHub이 예약 실행을 자주 건너뛰어서 10분마다 시도.
+    # 그 시간대 자료가 이미 있으면 몇 초 만에 끝나므로 표에는 1시간에 한 묶음만 쌓임.
+    - cron: '3,13,23,33,43,53 * * * *'
   workflow_dispatch:        # Actions 화면에서 직접 실행 버튼
 
 permissions:
@@ -20,18 +22,36 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: 서울 실시간 도시데이터 121곳 수집
+        id: collect
         shell: pwsh
         env:
           SEOUL_API_KEY: ${{ secrets.SEOUL_API_KEY }}
         run: ./scripts/collect_hourly.ps1
 
-      - name: 사이트 요약 갱신
+      # 따로 예약한 매일 작업도 건너뛰어져서, 아침 9시 이후 첫 수집 때 그날 것이 없으면 같이 함
+      - name: 매일 작업 (행사·숙박·외국인·환율) - 오늘 아직 안 했으면
+        id: daily
         if: always()
+        continue-on-error: true
+        shell: pwsh
+        env:
+          SEOUL_API_KEY: ${{ secrets.SEOUL_API_KEY }}
+        run: |
+          $now = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([datetime]::UtcNow, 'Asia/Seoul')
+          $today = $now.ToString('yyyy-MM-dd')
+          $log = 'data/status/매일작업기록.csv'
+          $done = (Test-Path $log) -and (Select-String -Path $log -Pattern ",`"$today`"," -SimpleMatch -Quiet)
+          if ($now.Hour -lt 9 -or $done) { Write-Host "매일 작업: 9시 전이거나 오늘 이미 함"; exit 0 }
+          "ran=true" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+          ./scripts/daily.ps1
+
+      - name: 사이트 요약 갱신
+        if: always() && (steps.collect.outputs.saved == 'true' || steps.daily.outputs.ran == 'true')
         shell: pwsh
         run: ./scripts/build_site_data.ps1
 
       - name: 원본을 Releases에 보관 (저장소 용량 절약)
-        if: always()
+        if: always() && steps.collect.outputs.saved == 'true'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}

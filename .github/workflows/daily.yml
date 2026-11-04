@@ -1,8 +1,8 @@
 name: 매일 작업 (행사·숙박·외국인·환율)
 
 on:
-  schedule:
-    - cron: '5 0 * * *'    # 매일 00:05 UTC = 한국 시간 09:05
+  # 예약 실행은 GitHub이 자주 건너뛰어서, 실시간 수집(hourly.yml)이 9시 이후 첫 실행 때 대신 함.
+  # 여기는 손으로 다시 돌릴 때만 씀.
   workflow_dispatch:
 
 permissions:
