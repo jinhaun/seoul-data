@@ -1,0 +1,6 @@
+NanumSquare Neo (나눔스퀘어 네오), Copyright NAVER Corporation.
+Unmodified web fonts (five weights) from NAVER's official distribution:
+https://hangeul.pstatic.net/hangeul_static/webfont/NanumSquareNeo/NanumSquareNeoTTF-{aLt,bRg,cBd,dEb,eHv}.woff2
+
+Licensed under the SIL Open Font License, Version 1.1.
+The full license text is in ../../OFL.txt.
