@@ -120,6 +120,11 @@ a:focus-visible{outline:3px solid #0b7075;outline-offset:3px}
 .fxc b{display:block;margin-top:3px;font-size:17px;font-weight:900;letter-spacing:-.03em}
 .fxc em{font-style:normal;font-size:10px;font-weight:850}
 .up{color:#c0392b}.dn{color:#167478}
+.fx.sky{grid-template-columns:repeat(6,minmax(0,1fr))}
+.fxc.hl{border-color:#e3b65e;background:var(--gold-card)}.fxc.hl span,.fxc.hl em{color:#5d5130}
+.sky-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;margin-top:16px}
+.sub-h{margin:0 0 8px;font-size:12px;font-weight:900;letter-spacing:-.02em}
+.bars.wide li{grid-template-columns:104px minmax(0,1fr) 52px}
 table{width:100%;border-collapse:collapse;font-size:11.5px}
 th,td{padding:8px 6px 8px 0;border-bottom:1px solid #e6eeeb;text-align:left;vertical-align:top}
 th{color:var(--muted);font-size:9.5px;font-weight:900;letter-spacing:.04em}
@@ -147,7 +152,8 @@ footer{padding:0 16px 30px;color:var(--muted);font-size:10px;font-weight:700;lin
   .lvls{grid-template-columns:repeat(4,minmax(0,1fr))}.lvl{min-width:0;padding:8px}
   .metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:12px 12px 0}
   .work{padding:12px 12px 24px;gap:12px}
-  .events,.fx,.dl{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .events,.fx,.fx.sky,.dl{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sky-grid{grid-template-columns:minmax(0,1fr)}
   footer{padding:0 12px 24px}
 }
 @media (max-width:480px){.events,.dl{grid-template-columns:minmax(0,1fr)}.saved{display:none}}
@@ -162,6 +168,7 @@ footer{padding:0 16px 30px;color:var(--muted);font-size:10px;font-weight:700;lin
       <a href="#now" class="on"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>지금의 서울</a>
       <a href="#flow"><svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 4 8-9"/></svg>하루의 흐름</a>
       <a href="#foreigner"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>외국인</a>
+      <a href="#sky"><svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>하늘길</a>
       <a href="#events"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>오늘의 행사<span class="badge" id="evBadge"></span></a>
       <a href="#fx"><svg viewBox="0 0 24 24"><path d="M4 7h13l-3-3M20 17H7l3 3"/></svg>환율·숙소</a>
       <a href="#log"><svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>수집 기록</a>
@@ -214,6 +221,19 @@ footer{padding:0 16px 30px;color:var(--muted);font-size:10px;font-weight:700;lin
           <details><summary>날짜별 표로 보기</summary><div class="tbl scroll"><table id="tNat"></table></div></details></div>
       </article>
 
+      <article class="card full" id="sky">
+        <div class="card-h"><div><h3>하늘길 · 김포·인천 공항</h3><p>여객기 실제 운항편(출발+도착) · 같은 비행기를 여러 항공사 이름으로 파는 공동운항은 한 번만 세요</p></div><span class="chip gold" id="skyChip"></span></div>
+        <div class="card-b">
+          <div class="fx sky" id="skyStats"></div>
+          <div class="sky-grid">
+            <div><h4 class="sub-h">어느 지역으로 오가나 (국제선)</h4><ul class="bars wide" id="skyReg"></ul></div>
+            <div><h4 class="sub-h">많이 오가는 도시 상위 10곳</h4><ol class="rank" id="skyTop"></ol></div>
+          </div>
+          <h4 class="sub-h" style="margin-top:18px">날짜별 국제선과 일본 노선</h4>
+          <div class="chart sm"><canvas id="cSky"></canvas></div><div class="legend line" id="skyLg"></div>
+        </div>
+      </article>
+
       <article class="card full" id="events">
         <div class="card-h"><div><h3>오늘의 행사</h3><p id="evSub">서울시 공식 자료 중 사람이 몰리는 행사만 골랐어요.</p></div><span class="chip" id="evChip"></span></div>
         <div class="card-b"><div class="events" id="evList"></div><button class="more" id="evMore" hidden>행사 더 보기</button></div>
@@ -252,7 +272,7 @@ footer{padding:0 16px 30px;color:var(--muted);font-size:10px;font-weight:700;lin
         </article>
       </div>
     </div>
-    <footer>출처 · 서울 열린데이터광장(공공누리 제1유형): 실시간 도시데이터, 외국인 생활인구, 문화행사, 교통통제, 숙박업 인허가 · 서울시설공단 공연장 일정 · 환율 유럽중앙은행 기준환율 · 글꼴 나눔스퀘어(네이버, 무료 공개 글꼴) · <span id="upd"></span></footer>
+    <footer>출처 · 서울 열린데이터광장(공공누리 제1유형): 실시간 도시데이터, 외국인 생활인구, 문화행사, 교통통제, 숙박업 인허가 · 서울시설공단 공연장 일정 · 공공데이터포털: 한국공항공사 실시간 항공기 운항정보, 인천국제공항공사 여객기 운항 현황 · 환율 유럽중앙은행 기준환율 · 글꼴 나눔스퀘어(네이버, 무료 공개 글꼴) · <span id="upd"></span></footer>
   </div>
 </div>
 
@@ -356,6 +376,29 @@ function render(d) {
   $('natLg').innerHTML = nats.map(n => `<span><i style="background:${NAT_COLOR[n] || css('--muted')}"></i>${esc(n)} ${lf ? man(lf.nat[n]) : ''}</span>`).join('');
   $('tNat').innerHTML = `<thead><tr><th>날짜</th><th class="n">전체</th>${nats.map(n => `<th class="n">${esc(n)}</th>`).join('')}</tr></thead><tbody>` +
     days.slice().reverse().map(x => `<tr><td>${dot(x.date)} ${x.wd}</td><td class="n">${fmt(x.total)}</td>${nats.map(n => `<td class="n">${fmt(x.nat[n])}</td>`).join('')}</tr>`).join('') + '</tbody>';
+
+  // 하늘길
+  const sk = d.flights;
+  if (!sk) { $('sky').hidden = true; } else {
+    const REG = {'일본':'#1baf7a','중국':'#eda100','동남아':'#e87ba4','미주·대양주':'#2a78d6','홍콩·대만·마카오':'#16a3b8','유럽':'#6250d6','기타':'#94a3a3'};
+    const s = sk.stat, intlAll = s.icn_intl + s.gmp_intl;
+    $('skyChip').textContent = `${dot(sk.date.slice(5))} 기준`;
+    $('skyStats').innerHTML = [
+      ['인천 국제선', s.icn_intl, '출발+도착'], ['김포 국제선', s.gmp_intl, '출발+도착'], ['김포 국내선', s.gmp_dom, '제주 등'],
+      ['일본 노선', s.japan, `국제선의 ${intlAll ? Math.round(s.japan / intlAll * 100) : 0}%`, 'hl'], ['지연', s.delay, '현황에 지연 표시'], ['결항', s.cancel, '사전결항 포함']
+    ].map(([k, v, note, cls]) => `<div class="fxc ${cls || ''}"><span>${k}</span><b>${fmt(v)}편</b><em>${note}</em></div>`).join('');
+    const rm = Math.max(...sk.regions.map(r => r.n), 1);
+    $('skyReg').innerHTML = sk.regions.map(r => `<li><span>${esc(r.r)}</span><div class="b"><span style="width:${(r.n / rm * 100).toFixed(1)}%;background:${REG[r.r] || REG['기타']}"></span></div><span class="n">${fmt(r.n)}편</span></li>`).join('');
+    $('skyTop').innerHTML = sk.top.map((t, i) => `<li><span class="no">${i + 1}</span><div class="nm">${esc(t.city)}<small><i class="dot" style="background:${REG[t.region] || REG['기타']}"></i>${esc(t.region)} · ${esc(t.code)}</small></div><span class="n">${fmt(t.n)}편</span></li>`).join('');
+    const sd = sk.days || [], few = sd.length < 15;
+    new Chart($('cSky'), {type: 'line', data: {labels: sd.map(x => `${dot(x.date.slice(5))} ${x.wd}`),
+      datasets: [
+        {label: '국제선 전체', data: sd.map(x => x.intl), borderColor: css('--teal'), backgroundColor: css('--teal'), borderWidth: 2.2, pointRadius: few ? 3 : 0, pointHoverRadius: 5, tension: .3},
+        {label: '일본 노선', data: sd.map(x => x.japan), borderColor: REG['일본'], backgroundColor: REG['일본'], borderWidth: 2.2, pointRadius: few ? 3 : 0, pointHoverRadius: 5, tension: .3}]},
+      options: opts({scales: {x: {ticks: {color: css('--muted'), maxRotation: 0, autoSkip: true, maxTicksLimit: 8}, grid: {display: false}, border: {color: css('--line')}},
+        y: {beginAtZero: true, ticks: {color: css('--muted'), callback: v => fmt(v)}, grid: {color: '#e6eeeb'}, border: {display: false}}}})});
+    $('skyLg').innerHTML = `<span><i style="background:${css('--teal')}"></i>국제선 전체</span><span><i style="background:${REG['일본']}"></i>일본 노선</span>`;
+  }
 
   // 행사
   $('evChip').textContent = ev.date ? `${dot(ev.date.slice(5))} · ${fmt(evN)}건 중 ${(ev.list || []).length}건` : '';

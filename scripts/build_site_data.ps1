@@ -115,8 +115,51 @@ if ($evFile.Count) {
     }
 }
 
+# ---------------- 하늘길 (김포·인천 여객기, 공동운항 중복 줄은 빼고 실제 운항편만)
+$Region = @{}
+function Add-Region([string]$name, [string]$codes) { foreach ($c in ($codes -split '\s+')) { if ($c) { $Region[$c] = $name } } }
+Add-Region '일본' 'NRT HND KIX ITM UKB FUK CTS NGO OKA KMQ KOJ KKJ HIJ TAK MYJ SDJ KIJ OIT FSZ AOJ UBJ TOY HSG NGS KMJ OKJ YGJ IBR AXT ISG MMB AKJ KCZ IZO HKD OBO KUH SHM TKS SHI KMI'
+Add-Region '중국' 'PEK PKX PVG SHA CAN SZX TAO SHE DLC YNJ CGQ HRB WEH YNT TSN XIY CKG CTU TFU HGH NKG XMN KMG CSX WUH SJW TNA NGB HAK SYX DYG ZUH JMU MDG LYI HFE FOC KWE KWL NNG TYN URC WUX CGO WNZ YIH YTY WDS LJG TXN WUS YNZ'
+Add-Region '홍콩·대만·마카오' 'HKG MFM TPE TSA KHH RMQ'
+Add-Region '동남아' 'BKK DMK HKT CNX USM SGN HAN DAD CXR PQC HPH VCA DLI MNL CEB CRK KLO TAG SIN KUL BKI PEN CGK DPS PNH REP KOS VTE LPQ RGN BWN KTI MDC'
+Add-Region '미주·대양주' 'LAX SFO JFK EWR IAD ORD ATL DFW SEA LAS HNL YVR YYZ BOS IAH DTW MSP SLC ANC GUM SPN SYD MEL BNE AKL PDX MIA PHX DEN SAN MEX MTY YYC'
+Add-Region '유럽' 'CDG LHR FRA MUC AMS FCO MXP BCN MAD IST VIE PRG ZRH HEL WAW BUD LIS ATH CPH ARN DUB OSL BRU'
+function Get-Region([string]$code, [string]$line) { if ($line -eq '국내') { return '국내' }; if ($Region.ContainsKey($code)) { return $Region[$code] }; return '기타' }
+
+$fFlights = @(Days-Back 'flights' 60)
+if ($fFlights.Count) {
+    $fDays = New-Object System.Collections.Generic.List[object]
+    $latestReal = @()
+    foreach ($f in $fFlights) {
+        $real = @(Read-Csv $f.FullName | Where-Object { $_.'코드쉐어' -notin 'Slave', 'Y' })
+        $intl = @($real | Where-Object { $_.'국내국제' -ne '국내' })
+        $fDays.Add([ordered]@{
+            date = $f.BaseName; wd = (Get-WeekdayKo ([datetime]::ParseExact($f.BaseName, 'yyyy-MM-dd', $null)))
+            intl = $intl.Count; japan = @($intl | Where-Object { (Get-Region $_.'상대공항코드' $_.'국내국제') -eq '일본' }).Count
+            icn = @($intl | Where-Object { $_.'공항' -eq '인천' }).Count; gmp_intl = @($intl | Where-Object { $_.'공항' -eq '김포' }).Count
+        })
+        $latestReal = $real
+    }
+    $li = @($latestReal | Where-Object { $_.'국내국제' -ne '국내' })
+    $out.flights = [ordered]@{
+        date = $fFlights[-1].BaseName
+        stat = [ordered]@{
+            icn_intl = @($li | Where-Object { $_.'공항' -eq '인천' }).Count
+            gmp_intl = @($li | Where-Object { $_.'공항' -eq '김포' }).Count
+            gmp_dom = @($latestReal | Where-Object { $_.'공항' -eq '김포' -and $_.'국내국제' -eq '국내' }).Count
+            japan = @($li | Where-Object { (Get-Region $_.'상대공항코드' '국제') -eq '일본' }).Count
+            delay = @($latestReal | Where-Object { $_.'현황' -match '지연' }).Count
+            cancel = @($latestReal | Where-Object { $_.'현황' -match '결항' }).Count
+        }
+        regions = @($li | Group-Object { Get-Region $_.'상대공항코드' '국제' } | Sort-Object Count -Descending | ForEach-Object { [ordered]@{ r = $_.Name; n = $_.Count } })
+        top = @($li | Group-Object '상대공항코드' | Sort-Object Count -Descending | Select-Object -First 10 | ForEach-Object {
+            [ordered]@{ city = ($_.Group[0].'상대공항' -replace '/\s+', '/'); code = $_.Name; region = (Get-Region $_.Name '국제'); n = $_.Count } })
+        days = $fDays
+    }
+}
+
 # ---------------- 환율 (최근 120 고시일)
-$fx = @(Read-Csv (Join-Path $RepoRoot 'data/exchange/환율_일별.csv') | Where-Object { $_.'고시여부' -eq 'Y' } | Select-Object -Last 120)
+$fx =@(Read-Csv (Join-Path $RepoRoot 'data/exchange/환율_일별.csv') | Where-Object { $_.'고시여부' -eq 'Y' } | Select-Object -Last 120)
 $out.exchange = @($fx | ForEach-Object { [ordered]@{ date = $_.'날짜'; USD = (Num $_.'원_달러'); JPY100 = (Num $_.'원_100엔'); CNY = (Num $_.'원_위안'); THB = (Num $_.'원_바트'); INR = (Num $_.'원_루피'); EUR = (Num $_.'원_유로') } })
 
 # ---------------- 숙박 (최근 30일 기록 + 최근 신규)
