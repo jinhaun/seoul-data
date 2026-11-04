@@ -56,6 +56,25 @@ foreach ($s in $spots) {
     }
 }
 
+# 서울시가 가끔 '정상'이라면서 인구 칸만 비워 보냄(일시적 공백). 1분 쉬고 그 장소만 다시 받음 (최대 2번)
+for ($round = 1; $round -le 2; $round++) {
+    $empty = @(for ($i = 0; $i -lt $rows.Count; $i++) { if (-not $rows[$i].'인구기준시각') { $i } })
+    if ($empty.Count -eq 0) { break }
+    Write-Host ("인구가 빈 곳 {0}곳, 1분 뒤 다시 받기 ({1}번째): {2}" -f $empty.Count, $round, (($empty | ForEach-Object { $rows[$_].'장소' }) -join ', '))
+    Start-Sleep -Seconds 60
+    foreach ($i in $empty) {
+        $name = "$($rows[$i].'장소')"
+        try {
+            $text = Get-Text ("http://openapi.seoul.go.kr:8088/$key/json/citydata/1/5/" + [Uri]::EscapeDataString($name)) $null
+            if ($text -notmatch '"INFO-000"') { continue }
+            $r = New-RealtimeRow ($text | ConvertFrom-Json).CITYDATA $collected
+            if ($r.'인구기준시각') { $rows[$i] = $r; $rawParts[$i] = $text; Write-Host "채움: $name ($($r.'인구기준시각'))" }
+        } catch { Write-Host "다시 받기 실패: $name - $(Hide-Key "$($_.Exception.Message)")" }
+    }
+}
+$stillEmpty = @($rows | Where-Object { -not $_.'인구기준시각' } | ForEach-Object { $_.'장소' })
+if ($stillEmpty.Count -and $env:GITHUB_ACTIONS) { Write-Host "::notice::서울시가 인구를 비워 보낸 곳 (다시 받아도 빔): $($stillEmpty -join ', ')" }
+
 # 인구 기준 시각(가장 많은 값)으로 날짜·파일 이름을 정함
 $stampText = @($rows | Group-Object '인구기준시각' | Sort-Object Count -Descending | Select-Object -First 1).Name
 $stamp = $null
