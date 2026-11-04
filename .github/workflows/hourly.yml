@@ -45,6 +45,18 @@ jobs:
           "ran=true" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
           ./scripts/daily.ps1
 
+      # 항공 API는 3일 전까지만 조회되므로 매일 어제(최종 결과)와 오늘을 받아 둠
+      - name: 김포·인천 여객기 운항정보 (어제·오늘)
+        if: always() && steps.daily.outputs.ran == 'true'
+        continue-on-error: true
+        shell: pwsh
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+        run: |
+          $today = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([datetime]::UtcNow, 'Asia/Seoul').Date
+          ./scripts/flights.ps1 -Date $today.AddDays(-1).ToString('yyyy-MM-dd')
+          ./scripts/flights.ps1 -Date $today.ToString('yyyy-MM-dd')
+
       - name: 사이트 요약 갱신
         if: always() && (steps.collect.outputs.saved == 'true' || steps.daily.outputs.ran == 'true')
         shell: pwsh

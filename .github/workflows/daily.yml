@@ -25,6 +25,16 @@ jobs:
           SEOUL_API_KEY: ${{ secrets.SEOUL_API_KEY }}
         run: ./scripts/daily.ps1
 
+      - name: 김포·인천 여객기 운항정보 (어제·오늘)
+        continue-on-error: true
+        shell: pwsh
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+        run: |
+          $today = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([datetime]::UtcNow, 'Asia/Seoul').Date
+          ./scripts/flights.ps1 -Date $today.AddDays(-1).ToString('yyyy-MM-dd')
+          ./scripts/flights.ps1 -Date $today.ToString('yyyy-MM-dd')
+
       - name: 사이트 요약 갱신
         if: always()
         shell: pwsh
