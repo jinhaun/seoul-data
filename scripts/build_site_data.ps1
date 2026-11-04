@@ -159,8 +159,27 @@ if ($fFlights.Count) {
 }
 
 # ---------------- 환율 (최근 120 고시일)
-$fx =@(Read-Csv (Join-Path $RepoRoot 'data/exchange/환율_일별.csv') | Where-Object { $_.'고시여부' -eq 'Y' } | Select-Object -Last 120)
+$fxAll = @(Read-Csv (Join-Path $RepoRoot 'data/exchange/환율_일별.csv') | Where-Object { $_.'고시여부' -eq 'Y' })
+$fx = @($fxAll | Select-Object -Last 120)
 $out.exchange = @($fx | ForEach-Object { [ordered]@{ date = $_.'날짜'; USD = (Num $_.'원_달러'); JPY100 = (Num $_.'원_100엔'); CNY = (Num $_.'원_위안'); THB = (Num $_.'원_바트'); INR = (Num $_.'원_루피'); EUR = (Num $_.'원_유로') } })
+# 비교 기준 3가지: 전날(직전 고시일), 한 달 전(달력 기준 같은 날 또는 그 전 마지막 고시일), 올해 최고
+if ($fxAll.Count -ge 2) {
+    $last = $fxAll[-1]; $prev = $fxAll[-2]
+    $mDay = ([datetime]::ParseExact($last.'날짜', 'yyyy-MM-dd', $null)).AddMonths(-1).ToString('yyyy-MM-dd')
+    $month = @($fxAll | Where-Object { $_.'날짜' -le $mDay } | Select-Object -Last 1)[0]
+    $year = @($fxAll | Where-Object { $_.'날짜'.StartsWith($last.'날짜'.Substring(0, 4)) })
+    $stat = [ordered]@{}
+    foreach ($c in @(@('USD', '원_달러'), @('JPY100', '원_100엔'), @('CNY', '원_위안'), @('THB', '원_바트'))) {
+        $col = $c[1]; $mx = @($year | Sort-Object { Num $_.$col } -Descending | Select-Object -First 1)[0]
+        $stat[$c[0]] = [ordered]@{
+            now = [ordered]@{ v = (Num $last.$col); date = $last.'날짜' }
+            prev = [ordered]@{ v = (Num $prev.$col); date = $prev.'날짜' }
+            month = $(if ($month) { [ordered]@{ v = (Num $month.$col); date = $month.'날짜' } } else { $null })
+            max = [ordered]@{ v = (Num $mx.$col); date = $mx.'날짜' }
+        }
+    }
+    $out.exchange_stat = $stat
+}
 
 # ---------------- 숙박 (최근 30일 기록 + 최근 신규)
 $lg = @(Read-Csv (Join-Path $RepoRoot 'data/status/숙박기록.csv') | Select-Object -Last 90)
