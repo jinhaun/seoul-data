@@ -109,12 +109,12 @@ a:focus-visible{outline:3px solid #0b7075;outline-offset:3px}
 .bars .n{text-align:right;color:var(--muted);font-size:11.5px}
 .events{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .ev.hide{display:none}.more{display:block;width:100%;min-height:40px;margin-top:10px;border:1px solid var(--line);border-radius:8px;color:var(--teal-dark);background:#fff;font:850 11px var(--font);cursor:pointer}.more:hover{border-color:var(--teal)}
-.ev{padding:12px 13px;border:1px solid #e1ebe8;border-radius:10px;background:var(--surface-2)}
+.ev{padding:9px 11px;border:1px solid #e1ebe8;border-radius:10px;background:var(--surface-2);min-width:0}
 .ev .k{display:inline-flex;min-height:20px;align-items:center;padding:0 8px;border-radius:999px;color:#115a5e;background:#dff2ef;font-size:10.5px;font-weight:850}
 .ev .k.venue{color:#5d4512;background:#f7e6c2}
-.ev .t{margin:7px 0 4px;font-size:12.5px;font-weight:900;line-height:1.45;letter-spacing:-.02em;word-break:keep-all}
+.ev .t{margin:5px 0 3px;font-size:12.5px;font-weight:900;line-height:1.4;letter-spacing:-.02em;word-break:keep-all;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .ev .t a{color:var(--ink);text-decoration:none}.ev .t a:hover{text-decoration:underline}
-.ev .w{color:var(--muted);font-size:11.5px;font-weight:700;line-height:1.5}
+.ev .w{color:var(--muted);font-size:11px;font-weight:700;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fx{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
 .fxc{padding:12px 13px;border:1px solid #e1ebe8;border-radius:10px;background:var(--surface-2);min-width:0}
 .fxc span{color:var(--muted);font-size:11.5px;font-weight:800}
@@ -421,10 +421,14 @@ function render(d) {
 
   // 행사
   $('evChip').textContent = ev.date ? `${dot(ev.date.slice(5))} · ${fmt(evN)}건 중 ${(ev.list || []).length}건` : '';
-  $('evList').innerHTML = (ev.list || []).slice(0, 27).map((x, i) => `<div class="ev${i >= 9 ? ' hide' : ''}"><span class="k ${x.src !== '서울시 문화행사' ? 'venue' : ''}">${esc(x.kind || x.src)}</span><div class="t">${link(x.link, x.name)}</div><div class="w">${esc([x.gu, x.place].filter(Boolean).join(' · '))}${x.time ? '<br>' + esc(x.time) : ''}${x.near ? '<br>근처 · ' + esc(x.near) : ''}</div></div>`).join('')
+  // 처음엔 6개만, 카드마다 제목 2줄·장소와 시간 한 줄 (전체 내용은 마우스를 올리면 보임)
+  const EV_FIRST = 6;
+  $('evList').innerHTML = (ev.list || []).slice(0, 24).map((x, i) => { const meta = [x.place || x.gu, x.time].filter(Boolean).join(' · ');
+    const full = [x.name, [x.gu, x.place].filter(Boolean).join(' '), x.time, x.near ? '근처 ' + x.near : ''].filter(Boolean).join('\n');
+    return `<div class="ev${i >= EV_FIRST ? ' hide' : ''}" title="${esc(full)}"><span class="k ${x.src !== '서울시 문화행사' ? 'venue' : ''}">${esc(x.kind || x.src)}</span><div class="t">${link(x.link, x.name)}</div><div class="w">${esc(meta)}</div></div>`; }).join('')
     || '<p style="color:var(--muted);font-size:11px">아직 자료가 없어요.</p>';
 
-  if ((ev.list || []).length > 9) { const b = $('evMore'); b.hidden = false; b.onclick = () => { document.querySelectorAll('#evList .hide').forEach(e => e.classList.remove('hide')); b.hidden = true; }; }
+  if ((ev.list || []).length > EV_FIRST) { const b = $('evMore'); b.hidden = false; b.textContent = `행사 ${Math.min(24, ev.list.length) - EV_FIRST}개 더 보기`; b.onclick = () => { document.querySelectorAll('#evList .hide').forEach(e => e.classList.remove('hide')); b.hidden = true; }; }
 
   // 환율
   const cur = [['USD', '1달러'], ['JPY100', '100엔'], ['CNY', '1위안'], ['THB', '1바트']];
