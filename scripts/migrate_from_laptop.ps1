@@ -1,7 +1,8 @@
-﻿# (한 번만 실행) 노트북 바탕화면\프로젝트 에 모아 둔 데이터를 이 저장소 형식으로 옮깁니다.
+﻿# 노트북 바탕화면\프로젝트 에 모아 둔 데이터를 이 저장소 형식으로 옮깁니다. (GitHub이 이미 받은 시각은 그대로 둠)
 #   -Part realtime|foreigner|events|lodging 로 일부만 실행 가능
+#   -Since 2026-11-03 처럼 주면 그 날짜 폴더부터만 옮김 (그 전 노트북 기록은 그대로 둠)
 
-param([string]$Part)
+param([string]$Part, [string]$Since)
 
 . "$PSScriptRoot/common.ps1"
 $Src = 'C:\Users\Administrator\Desktop\프로젝트'
@@ -16,7 +17,7 @@ function Read-GzText([string]$path) {
 # ---------------- 실시간 121곳 (30분 간격이던 기간 포함, 원본 전부를 요약 표로)
 if (-not $Part -or $Part -eq 'realtime') {
     $byDay = @{}; $status = New-Object System.Collections.Generic.List[object]
-    $files = @(Get-ChildItem (Join-Path $Src 'data') -Recurse -File | Where-Object { $_.Name -match '^\d{4}\.json\.gz$' } | Sort-Object FullName)
+    $files = @(Get-ChildItem (Join-Path $Src 'data') -Recurse -File | Where-Object { $_.Name -match '^\d{4}\.json\.gz$' -and (-not $Since -or $_.Directory.Name.Substring(0, 10) -ge $Since) } | Sort-Object FullName)
     $i = 0
     foreach ($f in $files) {
         $i++; if ($i % 50 -eq 0) { Write-Host "실시간 변환 $i / $($files.Count)" }
@@ -40,7 +41,7 @@ if (-not $Part -or $Part -eq 'realtime') {
         Write-CsvBom $dst (@($have) + $add | Sort-Object '인구기준시각', '장소코드')
     }
     $st = Join-Path $RepoRoot 'data/status/수집기록.csv'
-    $keep = @(Read-Csv $st | Where-Object { $_.'실행' -ne 'laptop' })
+    $keep = @(Read-Csv $st | Where-Object { $_.'실행' -ne 'laptop' -or ($Since -and $_.'수집시각' -lt $Since) })
     Write-CsvBom $st ($status.ToArray() + $keep | Sort-Object '수집시각')
     Write-Host "실시간: 원본 $($files.Count)개 -> $($byDay.Count)일"
 }
