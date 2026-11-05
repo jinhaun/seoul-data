@@ -1,15 +1,25 @@
 name: 실시간 수집 (1시간마다)
 
+# 이어달리기 방식
+#  - GitHub 예약 실행은 붐비면 건너뛰어서(11/3~11/5 하루 몇 번만 실행됨) 믿을 수 없음
+#  - 그래서 한 번 실행되면 5시간 반 동안 켜진 채 10분마다 확인하고(scripts/run_loop.ps1),
+#    끝나기 직전에 다음 주자를 '직접 실행'으로 띄움 (직접 실행은 바로 처리됨)
+#  - 매시 33분 예약은 이어달리기가 끊겼을 때 다시 시작시키는 예비
+#  - 같은 시간대는 한 번만 저장하므로 주자가 겹쳐도 자료가 두 번 쌓이지 않음
+
 on:
   schedule:
-    # 매시 33분. GitHub 예약 실행은 붐비면 건너뛰므로(10분마다로 늘려도 효과 없었음)
-    # 바깥 예약 사이트에서 '직접 실행' 신호를 보내는 방식과 함께 씀.
-    # 그 시간대 자료가 이미 있으면 바로 끝나므로 여러 번 실행돼도 1시간에 한 묶음만 쌓임.
     - cron: '33 * * * *'
-  workflow_dispatch:        # Actions 화면에서 직접 실행 버튼
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: '이번 주자가 돌 시간(분)'
+        required: false
+        default: '330'
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: data-commit
@@ -18,72 +28,25 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
 
-      - name: 서울 실시간 도시데이터 121곳 수집
-        id: collect
-        shell: pwsh
-        env:
-          SEOUL_API_KEY: ${{ secrets.SEOUL_API_KEY }}
-        run: ./scripts/collect_hourly.ps1
-
-      # 따로 예약한 매일 작업도 건너뛰어져서, 아침 9시 이후 첫 수집 때 그날 것이 없으면 같이 함
-      - name: 매일 작업 (행사·숙박·외국인·환율) - 오늘 아직 안 했으면
-        id: daily
-        if: always()
-        continue-on-error: true
-        shell: pwsh
-        env:
-          SEOUL_API_KEY: ${{ secrets.SEOUL_API_KEY }}
-        run: |
-          $now = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([datetime]::UtcNow, 'Asia/Seoul')
-          $today = $now.ToString('yyyy-MM-dd')
-          $log = 'data/status/매일작업기록.csv'
-          $done = (Test-Path $log) -and (Select-String -Path $log -Pattern ",`"$today`"," -SimpleMatch -Quiet)
-          if ($now.Hour -lt 9 -or $done) { Write-Host "매일 작업: 9시 전이거나 오늘 이미 함"; exit 0 }
-          "ran=true" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
-          ./scripts/daily.ps1
-
-      # 항공 API는 3일 전까지만 조회되므로 매일 어제(최종 결과)와 오늘을 받아 둠
-      - name: 김포·인천 여객기 운항정보 (어제·오늘)
-        if: always() && steps.daily.outputs.ran == 'true'
-        continue-on-error: true
-        shell: pwsh
-        env:
-          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
-        run: |
-          $today = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId([datetime]::UtcNow, 'Asia/Seoul').Date
-          ./scripts/flights.ps1 -Date $today.AddDays(-1).ToString('yyyy-MM-dd')
-          ./scripts/flights.ps1 -Date $today.ToString('yyyy-MM-dd')
-
-      - name: 사이트 요약 갱신
-        if: always() && (steps.collect.outputs.saved == 'true' || steps.daily.outputs.ran == 'true')
-        shell: pwsh
-        run: ./scripts/build_site_data.ps1
-
-      - name: 원본을 Releases에 보관 (저장소 용량 절약)
-        if: always() && steps.collect.outputs.saved == 'true'
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          shopt -s nullglob
-          for f in tmp/raw/*.json.gz; do
-            name=$(basename "$f")
-            tag="raw-${name:0:7}"
-            gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --title "원본 ${name:0:7}" --notes "1시간마다 받은 서울 실시간 도시데이터 원본 (gzip JSON, 121곳)"
-            gh release upload "$tag" "$f" --clobber
-          done
-
-      - name: 저장소에 저장
-        if: always()
+      - name: 저장소 설정
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data site
-          if git diff --cached --quiet; then echo "바뀐 내용 없음"; exit 0; fi
-          git commit -m "실시간 수집 $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M')"
-          for i in 1 2 3; do git pull --rebase && git push && exit 0; sleep 10; done
-          exit 1
+
+      - name: 10분마다 수집 (실시간·매일 작업·항공)
+        shell: pwsh
+        env:
+          SEOUL_API_KEY: ${{ secrets.SEOUL_API_KEY }}
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/run_loop.ps1 -Minutes ${{ inputs.minutes || '330' }}
+
+      - name: 다음 주자 실행 (바통 넘기기)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run hourly.yml --ref main
