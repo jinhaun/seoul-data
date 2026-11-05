@@ -81,18 +81,29 @@ function Read-Csv([string]$path) {
     return @(Import-Csv $path -Encoding UTF8)
 }
 
-# 실시간 도시데이터 장소 목록 (사이트에서 최신 목록, 실패하면 저장된 목록)
+# 실시간 도시데이터 장소 목록 = 저장된 목록 + 사이트 최신 목록에 새로 생긴 곳
+# 사이트 목록에서 쌍문역·수유역 같은 곳이 가끔 빠졌다 돌아와서(11/5), 한 번이라도 있던 곳은 계속 받음.
+# 저장 파일은 새 장소가 생겼을 때만 고침 (매번 고치면 쓸데없는 저장이 생김)
 function Get-Hotspots {
     $meta = Join-Path $RepoRoot 'data/meta/장소_121곳.csv'
+    $saved = @(Read-Csv $meta)
     try {
         $url = 'https://data.seoul.go.kr/SeoulRtd/api/hotspot-category?page=1&category=%EC%A0%84%EC%B2%B4%EB%B3%B4%EA%B8%B0&count=300'
         $res = Get-Json $url 'https://data.seoul.go.kr/SeoulRtd/list'
         $list = @($res.row | ForEach-Object {
             [pscustomobject][ordered]@{ '장소' = $_.area_nm; '분류' = $_.category; '위도' = $_.x; '경도' = $_.y }   # 이 목록은 x=위도, y=경도
         })
-        if ($list.Count -ge 50) { Write-CsvBom $meta $list; return $list }
+        if ($list.Count -ge 50) {
+            $known = @{}; foreach ($s in $saved) { $known[$s.'장소'] = $true }
+            $new = @($list | Where-Object { -not $known[$_.'장소'] })
+            if ($new.Count -or -not $saved.Count) {
+                Write-Host ("새 장소: " + (($new | ForEach-Object { $_.'장소' }) -join ', '))
+                $saved = @(@($saved) + $new | Sort-Object '장소')
+                Write-CsvBom $meta $saved
+            }
+        }
     } catch { Write-Host "장소 목록 갱신 실패, 저장된 목록 사용: $($_.Exception.Message)" }
-    return Read-Csv $meta
+    return $saved
 }
 
 # citydata 응답(장소 하나) -> 표 한 줄
