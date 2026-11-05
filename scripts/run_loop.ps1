@@ -16,8 +16,17 @@ $end = (Get-Date).AddMinutes($Minutes)
 
 function Invoke-Git([string[]]$a) { & git @a 2>&1 | ForEach-Object { "$_" } | Write-Host; return $LASTEXITCODE }
 
+# 저장소를 GitHub 최신 상태로 맞춤. 노트북에서 같은 파일을 고쳐 올려 부딪혀도 여기서 정리됨.
+# (이 바퀴에 받은 자료가 버려져도 수집기록에 남지 않으므로 다음 바퀴에 그 시간대를 다시 받음)
+function Reset-ToRemote {
+    if (Test-Path (Join-Path $RepoRoot '.git/rebase-merge')) { Invoke-Git @('rebase', '--abort') | Out-Null }
+    if (Test-Path (Join-Path $RepoRoot '.git/rebase-apply')) { Invoke-Git @('rebase', '--abort') | Out-Null }
+    Invoke-Git @('fetch', '-q', 'origin', 'main') | Out-Null
+    Invoke-Git @('reset', '-q', '--hard', 'origin/main') | Out-Null
+}
+
 function Invoke-Cycle {
-    Invoke-Git @('pull', '--rebase', '-q') | Out-Null
+    Reset-ToRemote
 
     # 2) 실시간
     & "$PSScriptRoot/collect_hourly.ps1"
@@ -53,10 +62,12 @@ function Invoke-Cycle {
     if ($LASTEXITCODE -eq 0) { return }
     git commit -q -m ("실시간 수집 " + (Get-KstNow).ToString('yyyy-MM-dd HH:mm'))
     for ($i = 1; $i -le 3; $i++) {
-        if ((Invoke-Git @('pull', '--rebase', '-q')) -eq 0 -and (Invoke-Git @('push', '-q')) -eq 0) { Write-Host "저장소에 올림"; return }
+        if ((Invoke-Git @('pull', '--rebase', '-q')) -ne 0) { break }   # 같은 파일이 부딪힘 → 아래에서 정리
+        if ((Invoke-Git @('push', '-q')) -eq 0) { Write-Host "저장소에 올림"; return }
         Start-Sleep -Seconds 10
     }
-    Write-Host "::warning::저장소에 올리기 실패 (다음 바퀴에 다시 시도)"
+    Write-Host "::warning::저장소에 올리기 실패 → 최신 상태로 되돌리고 다음 바퀴에 그 시간대를 다시 받음"
+    Reset-ToRemote
 }
 
 while ($true) {
