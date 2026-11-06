@@ -40,7 +40,10 @@ $out.last_run = $(if ($log.Count) { [ordered]@{ at = $log[0].'수집시각'; bas
 
 # ---------------- 지금 붐비는 곳 (가장 최근 기준시각)
 if ($latestRows.Count) {
-    $lastStamp = @($latestRows | Sort-Object '인구기준시각' | Select-Object -Last 1)[0].'인구기준시각'
+    # 121곳이 거의 다 있는(100곳 이상) 가장 최근 시각. 서울시가 갱신하는 순간 받으면 한 시각에 일부 장소만 있음
+    $stampGroups = @($latestRows | Where-Object { $_.'인구기준시각' } | Group-Object '인구기준시각' | Sort-Object Name)
+    $full = @($stampGroups | Where-Object { $_.Count -ge 100 })
+    $lastStamp = $(if ($full.Count) { $full[-1].Name } else { @($stampGroups | Sort-Object Count | Select-Object -Last 1)[0].Name })
     $snap = @($latestRows | Where-Object { $_.'인구기준시각' -eq $lastStamp })
     $out.now = [ordered]@{
         base = $lastStamp
