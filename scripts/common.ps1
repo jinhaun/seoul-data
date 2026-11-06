@@ -30,18 +30,24 @@ function Get-ApiKey {
     throw 'SEOUL_API_KEY 가 없습니다.'
 }
 
-# 웹에서 글자 받기 (실패하면 최대 3번 재시도)
+# 웹에서 글자 받기 (실패하면 최대 3번 재시도, 한 번에 30초까지만 기다림)
+# 예전 WebClient는 100초씩 기다려서, 접속이 막힌 서버에서 한 바퀴가 너무 오래 걸렸음 (11/5 밤)
 function Get-Text([string]$url, [string]$referer) {
     for ($try = 1; ; $try++) {
-        $wc = New-Object System.Net.WebClient
+        $resp = $null
         try {
-            if ($referer) { $wc.Headers.Add('Referer', $referer) }
-            $wc.Headers.Add('User-Agent', 'seoul-data-collector (github.com/jinhaun/seoul-data)')
-            return $Utf8.GetString($wc.DownloadData($url))
+            $req = [System.Net.HttpWebRequest]::Create($url)
+            $req.Timeout = 30000; $req.ReadWriteTimeout = 30000
+            $req.UserAgent = 'seoul-data-collector (github.com/jinhaun/seoul-data)'
+            if ($referer) { $req.Referer = $referer }
+            $resp = $req.GetResponse()
+            $ms = New-Object System.IO.MemoryStream
+            $resp.GetResponseStream().CopyTo($ms)
+            return $Utf8.GetString($ms.ToArray())
         } catch {
             if ($try -ge 3) { throw }
             Start-Sleep -Seconds (5 * $try)
-        } finally { $wc.Dispose() }
+        } finally { if ($resp) { $resp.Dispose() } }
     }
 }
 

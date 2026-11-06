@@ -49,4 +49,11 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run hourly.yml --ref main
+        # 실패하면 20초 간격으로 3번 더 시도하고, 이유를 알림으로 남김 (11/6 01:04 한 번 실패)
+        run: |
+          for i in 1 2 3 4; do
+            if out=$(gh workflow run hourly.yml --ref main 2>&1); then echo "다음 주자 실행함"; exit 0; fi
+            echo "::warning::바통 넘기기 실패 ($i번째): $out"
+            sleep 20
+          done
+          exit 1

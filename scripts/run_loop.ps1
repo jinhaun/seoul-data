@@ -28,8 +28,9 @@ function Reset-ToRemote {
 function Invoke-Cycle {
     Reset-ToRemote
 
-    # 2) 실시간
+    # 2) 실시간 (실패하면 바퀴 수를 셈 → 아래에서 연속 실패면 일찍 바통 넘김)
     & "$PSScriptRoot/collect_hourly.ps1"
+    if ($LASTEXITCODE -ne 0) { $script:fails++ } else { $script:fails = 0 }
 
     # 3) 매일 작업 (9시 이후, 오늘 기록이 없을 때만)
     $now = Get-KstNow; $today = $now.ToString('yyyy-MM-dd')
@@ -70,9 +71,13 @@ function Invoke-Cycle {
     Reset-ToRemote
 }
 
+$fails = 0
 while ($true) {
-    try { Invoke-Cycle } catch { Write-Host "::warning::한 바퀴 실패: $($_.Exception.Message)" }
+    try { Invoke-Cycle } catch { $fails++; Write-Host "::warning::한 바퀴 실패: $($_.Exception.Message)" }
+    # 같은 서버에서 서울시 접속이 두 바퀴 연속 안 되면 이 서버는 그만 쓰고 새 서버(다음 주자)로 넘김
+    # (11/5 밤: 한 서버에서 5시간 반 동안 시간 초과만 반복해 20~0시를 못 받음)
+    if ($fails -ge 2) { Write-Host "::warning::두 바퀴 연속 실패 → 일찍 다음 주자에게 넘김"; break }
     if ((Get-Date).AddMinutes(10) -ge $end) { break }
     Start-Sleep -Seconds 600
 }
-Write-Host "이번 주자 끝 ($Minutes 분)"
+Write-Host "이번 주자 끝"
