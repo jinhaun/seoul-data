@@ -1,3 +1,9 @@
 tmp/
 *.tmp
 config.txt
+# 슬랙 봇: 실행할 때마다 새로 만들어지는 결과물 (게시 기록·쇼츠 주제 기록만 올림)
+bots/.env
+bots/음악/*.wav
+bots/*/리포트/*
+!bots/서울브리핑/리포트/쇼츠주제_기록.csv
+__pycache__/

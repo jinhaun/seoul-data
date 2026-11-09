@@ -1,0 +1,179 @@
+name: 슬랙 게시 (데일리 카드 · 국가대항전 · 주간 보고)
+
+# 노트북·Claude 없이 GitHub가 서울 데이터를 슬랙에 올림 (bots/ 폴더)
+#  - 서울브리핑(데일리 카드): 매일, 그날 매일 작업(외국인·환율 등)이 끝난 뒤
+#  - 국가대항전(쇼츠 영상 + 카드) · 주간리포트: 월요일
+# 언제 실행되나:
+#  - 이어달리기(hourly.yml → scripts/run_loop.ps1)가 9시 이후 매일 작업이 끝나면 이 워크플로를 '직접 실행'함
+#  - 매일 9:50·13:50(한국 시간) 예약은 예비 (GitHub 예약은 붐비면 건너뜀)
+#  - bots/게시기록.csv 에 오늘 '게시'·'보류'가 있으면 다시 올리지 않음
+# 필요한 비밀값(저장소 Settings → Secrets and variables → Actions, 사용자가 직접 입력):
+#  SLACK_WEBHOOK_ALERT, SLACK_WEBHOOK_TEST (필수) · SLACK_WEBHOOK_DATA (주간 보고 채널, 없으면 test로)
+#  SLACK_BOT_TOKEN, SLACK_CHANNEL_ALERT (영상 파일 올리기, 없으면 카드만)
+
+on:
+  schedule:
+    - cron: '50 0 * * *'
+    - cron: '50 4 * * *'
+  workflow_dispatch:
+    inputs:
+      bot:
+        description: '무엇을 (오늘 할 것 전부 / 서울브리핑 / 국가대항전 / 주간리포트)'
+        required: false
+        default: '오늘'
+      channel:
+        description: '어디로 (alert = 원래 채널, test = 시험 채널)'
+        required: false
+        default: 'alert'
+      date:
+        description: '기준일 YYYY-MM-DD (비우면 오늘)'
+        required: false
+        default: ''
+      force:
+        description: '오늘 이미 올렸어도 다시 올리기 (yes)'
+        required: false
+        default: ''
+      dry:
+        description: '시험 실행: 보내지 않고 만들기만 (yes)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: slack-bots
+  cancel-in-progress: false
+
+env:
+  SLACK_WEBHOOK_ALERT: ${{ secrets.SLACK_WEBHOOK_ALERT }}
+  SLACK_WEBHOOK_TEST: ${{ secrets.SLACK_WEBHOOK_TEST }}
+  SLACK_WEBHOOK_DATA: ${{ secrets.SLACK_WEBHOOK_DATA }}
+  SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+  SLACK_CHANNEL_ALERT: ${{ secrets.SLACK_CHANNEL_ALERT }}
+  SLACK_CHANNEL_TEST: ${{ secrets.SLACK_CHANNEL_TEST }}
+  SLACK_DRY_RUN: ${{ inputs.dry == 'yes' && '1' || '0' }}
+  BOT: ${{ inputs.bot || '오늘' }}
+  CH: ${{ inputs.channel || 'alert' }}
+  REF: ${{ inputs.date }}
+  FORCE: ${{ inputs.force }}
+  PYTHONUTF8: '1'
+
+jobs:
+  daily:
+    name: 데일리 카드
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TZ: Asia/Seoul
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 오늘 올릴지 판단
+        id: go
+        run: |
+          today=$(date +%F)
+          if [ "$BOT" != "오늘" ] && [ "$BOT" != "서울브리핑" ]; then echo "run=no" >> $GITHUB_OUTPUT; echo "서울브리핑 요청 아님"; exit 0; fi
+          if [ -z "$SLACK_WEBHOOK_ALERT" ] && [ "$SLACK_DRY_RUN" != "1" ]; then echo "::warning::비밀값 SLACK_WEBHOOK_ALERT가 아직 없어 건너뜀"; echo "run=no" >> $GITHUB_OUTPUT; exit 0; fi
+          if [ "$FORCE" != "yes" ] && [ -z "$REF" ]; then
+            if [ -f bots/게시기록.csv ] && grep -q "\"$today\",\"서울브리핑\",\"\(게시\|보류\)\"" bots/게시기록.csv; then echo "오늘 이미 올림"; echo "run=no" >> $GITHUB_OUTPUT; exit 0; fi
+            if ! grep -q ",\"$today\"," data/status/매일작업기록.csv; then echo "오늘 매일 작업(외국인·환율)이 아직 안 끝남 → 다음에"; echo "run=no" >> $GITHUB_OUTPUT; exit 0; fi
+          fi
+          echo "run=yes" >> $GITHUB_OUTPUT
+
+      - uses: actions/setup-python@v5
+        if: steps.go.outputs.run == 'yes'
+        with:
+          python-version: '3.12'
+
+      - name: 데일리 카드 만들고 올리기
+        if: steps.go.outputs.run == 'yes'
+        working-directory: bots/서울브리핑
+        run: |
+          pip install -q -r ../국가대항전/requirements.txt
+          python -X utf8 run_brief.py ${REF:-$(date +%F)} "$CH"
+
+      - name: 게시 기록 저장소에 올리기
+        if: always() && steps.go.outputs.run == 'yes'
+        run: bash bots/올리기.sh "데일리 카드 게시 기록"
+
+  weekly:
+    name: 국가대항전 · 주간 보고 (월요일)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 오늘 할지 판단
+        id: go
+        shell: pwsh
+        run: |
+          tzutil /s "Korea Standard Time"
+          $now = [DateTime]::UtcNow.AddHours(9); $today = $now.ToString('yyyy-MM-dd')
+          $log = 'bots/게시기록.csv'
+          function Done($b) { (Test-Path $log) -and (Select-String -Path $log -Pattern "`"$today`",`"$b`",`"(게시|보류)`"" -Quiet) }
+          $want = @()
+          if ($env:BOT -eq '오늘') { if ($now.DayOfWeek -eq 'Monday') { $want = '국가대항전', '주간리포트' } }
+          elseif ($env:BOT -in '국가대항전', '주간리포트') { $want = @($env:BOT) }
+          if ($env:FORCE -ne 'yes' -and -not $env:REF) { $want = @($want | Where-Object { -not (Done $_) }) }
+          if ($want -and -not $env:SLACK_WEBHOOK_ALERT -and $env:SLACK_DRY_RUN -ne '1') { Write-Host "::warning::비밀값 SLACK_WEBHOOK_ALERT가 아직 없어 건너뜀"; $want = @() }
+          $ready = $env:FORCE -eq 'yes' -or $env:REF -or (Select-String -Path data/status/매일작업기록.csv -Pattern ",`"$today`"," -SimpleMatch -Quiet)
+          if ($want -and -not $ready) { Write-Host "오늘 매일 작업이 아직 안 끝남 → 다음에"; $want = @() }
+          Write-Host ("할 일: " + ($(if ($want) { $want -join ', ' } else { '없음' })))
+          "nation=$(if ('국가대항전' -in $want) {'yes'} else {'no'})" >> $env:GITHUB_OUTPUT
+          "weekly=$(if ('주간리포트' -in $want) {'yes'} else {'no'})" >> $env:GITHUB_OUTPUT
+          "any=$(if ($want) {'yes'} else {'no'})" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/setup-python@v5
+        if: steps.go.outputs.any == 'yes'
+        with:
+          python-version: '3.12'
+
+      - name: 준비 (파이썬 꾸러미 · 영상 도구 · 글꼴 · 배경음악)
+        if: steps.go.outputs.any == 'yes'
+        shell: pwsh
+        run: |
+          pip install -q -r bots/국가대항전/requirements.txt
+          if ('${{ steps.go.outputs.nation }}' -eq 'yes') {
+            if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) { choco install ffmpeg -y --no-progress | Out-Null }
+            $reg = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts'
+            foreach ($f in Get-ChildItem bots/글꼴 -Filter *.ttf) {
+              Copy-Item $f.FullName "$env:WINDIR\Fonts\$($f.Name)" -Force
+              New-ItemProperty -Path $reg -Name "$($f.BaseName) (TrueType)" -Value $f.Name -PropertyType String -Force | Out-Null
+            }
+            python -X utf8 bots/음악/작곡.py
+          }
+
+      - name: 국가대항전 (집계 → 검증 → 영상 → 슬랙)
+        if: steps.go.outputs.nation == 'yes'
+        shell: pwsh
+        working-directory: bots/국가대항전
+        run: |
+          $env:Path = "C:\ProgramData\chocolatey\bin;" + $env:Path
+          $ref = if ($env:REF) { $env:REF } else { [DateTime]::UtcNow.AddHours(9).ToString('yyyy-MM-dd') }
+          python -X utf8 실행.py $env:CH $ref
+
+      - name: 주간 데이터 보고
+        if: always() && steps.go.outputs.weekly == 'yes'
+        shell: pwsh
+        working-directory: bots/주간리포트
+        run: |
+          $ref = if ($env:REF) { $env:REF } else { [DateTime]::UtcNow.AddHours(9).ToString('yyyy-MM-dd') }
+          $ch = if ($env:CH -eq 'test') { 'test' } else { 'data' }
+          python -X utf8 주간리포트.py $ref $ch
+
+      - name: 영상·썸네일 보관 (Actions 화면에서 30일 동안 내려받기)
+        if: always() && steps.go.outputs.nation == 'yes'
+        uses: actions/upload-artifact@v4
+        with:
+          name: 국가대항전-쇼츠
+          path: |
+            bots/국가대항전/리포트/*.mp4
+            bots/국가대항전/리포트/*.png
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: 게시 기록 저장소에 올리기
+        if: always() && steps.go.outputs.any == 'yes'
+        shell: bash
+        run: bash bots/올리기.sh "국가대항전·주간 보고 게시 기록"

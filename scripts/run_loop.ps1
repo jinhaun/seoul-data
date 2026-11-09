@@ -43,6 +43,19 @@ function Invoke-Cycle {
         & "$PSScriptRoot/flights.ps1" -Date $today
     }
 
+    # 3-1) 오늘 매일 작업이 이미 저장소에 올라가 있는데(= 이번 바퀴 시작 때 $done) 슬랙 게시를 아직 안 했으면
+    #      → 슬랙 게시 워크플로 실행 (주자마다 한 번만). 올릴지 여부는 slack.yml이 bots/게시기록.csv를 보고 다시 판단함
+    if ($done -and -not $script:slackAsked) {
+        $plog = Join-Path $RepoRoot 'bots/게시기록.csv'
+        $need = @('서울브리핑'); if ($now.DayOfWeek -eq 'Monday') { $need += '국가대항전', '주간리포트' }
+        $left = @($need | Where-Object { -not ((Test-Path $plog) -and (Select-String -Path $plog -Pattern "`"$today`",`"$_`",`"(게시|보류)`"" -Quiet)) })
+        if ($left) {
+            gh workflow run slack.yml --ref main *> $null
+            if ($LASTEXITCODE -eq 0) { Write-Host "슬랙 게시 실행 요청 ($($left -join ', '))"; $script:slackAsked = $true }
+            else { Write-Host "::warning::슬랙 게시 실행 요청 실패 → 다음 바퀴에 다시" }
+        }
+    }
+
     # 4) 바뀐 게 있을 때만 사이트 요약·보관·올리기
     if (-not (git status --porcelain -- data)) { Write-Host "바뀐 자료 없음"; return }
     & "$PSScriptRoot/build_site_data.ps1"
@@ -72,6 +85,7 @@ function Invoke-Cycle {
 }
 
 $fails = 0
+$slackAsked = $false
 while ($true) {
     try { Invoke-Cycle } catch { $fails++; Write-Host "::warning::한 바퀴 실패: $($_.Exception.Message)" }
     # 같은 서버에서 서울시 접속이 두 바퀴 연속 안 되면 이 서버는 그만 쓰고 새 서버(다음 주자)로 넘김
