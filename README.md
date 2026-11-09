@@ -3,6 +3,7 @@
 
 👉 **사이트: https://jinhaun.github.io/seoul-data/**
 📘 **작업 설명서 (구조·노트북 설정·문제 해결): [AGENTS.md](AGENTS.md)**
+🚀 **새 노트북에서 Claude·Codex로 시작하기: [시작_프롬프트.md](시작_프롬프트.md)**
 
 GitHub Actions가 컴퓨터 없이 알아서 모읍니다. 한 번 실행되면 5시간 반 동안 켜진 채 10분마다 확인하고, 끝날 때 다음 실행을 스스로 띄우는 "이어달리기" 방식입니다.
 

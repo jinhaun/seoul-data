@@ -18,16 +18,30 @@ function Get-KstNow {
 
 function Get-WeekdayKo([datetime]$d) { return $d.ToString('ddd', $KoCulture) }
 
-# 서울시 인증키: GitHub Actions 비밀값(SEOUL_API_KEY) → 없으면 노트북의 config.txt (로컬 테스트용)
+# 노트북 수집 폴더 찾기 (노트북 프로그램과 config.txt 가 있는 곳)
+#  1) 환경변수 SEOUL_LAPTOP_DIR  2) 바탕화면\서울 데이터 정기 수집 (새 노트북)  3) 바탕화면\프로젝트 (2026년 노트북)
+function Get-LaptopRoot {
+    $desk = [Environment]::GetFolderPath('Desktop')
+    foreach ($p in @($env:SEOUL_LAPTOP_DIR, (Join-Path $desk '서울 데이터 정기 수집'), (Join-Path $desk '프로젝트'))) {
+        if ($p -and (Test-Path (Join-Path $p 'collect.ps1'))) { return $p }
+    }
+    return $null
+}
+
+# config.txt 에서 조건에 맞는 첫 줄 (#로 시작하는 줄과 한글 설명 줄은 건너뜀)
+function Get-ConfigLine([scriptblock]$match) {
+    $root = Get-LaptopRoot; if (-not $root) { return $null }
+    $cfg = Join-Path $root 'config.txt'; if (-not (Test-Path $cfg)) { return $null }
+    return Get-Content $cfg -Encoding UTF8 | ForEach-Object { $_.Trim() } |
+        Where-Object { $_ -and -not $_.StartsWith('#') -and $_ -notmatch '[가-힣]' } | Where-Object $match | Select-Object -First 1
+}
+
+# 서울시 인증키: GitHub Actions 비밀값(SEOUL_API_KEY) → 없으면 노트북의 config.txt
 function Get-ApiKey {
     if ($env:SEOUL_API_KEY) { return $env:SEOUL_API_KEY.Trim() }
-    $cfg = 'C:\Users\Administrator\Desktop\프로젝트\config.txt'
-    if (Test-Path $cfg) {
-        $k = Get-Content $cfg -Encoding UTF8 | ForEach-Object { $_.Trim() } |
-            Where-Object { $_ -and -not $_.StartsWith('#') -and -not $_.Contains('=') } | Select-Object -First 1
-        if ($k) { return $k }
-    }
-    throw 'SEOUL_API_KEY 가 없습니다.'
+    $k = Get-ConfigLine { -not $_.Contains('=') -and $_ -notmatch '^[0-9a-fA-F]{64}$' }
+    if ($k) { return $k }
+    throw 'SEOUL_API_KEY 가 없습니다. (노트북에서는 수집 폴더의 config.txt 첫 줄에 서울시 인증키)'
 }
 
 # 웹에서 글자 받기 (실패하면 최대 3번 재시도, 한 번에 30초까지만 기다림)

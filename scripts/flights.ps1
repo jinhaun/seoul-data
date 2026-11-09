@@ -13,12 +13,9 @@ param([string]$Date)
 # 공공데이터포털 인증키: GitHub에서는 DATA_GO_KR_KEY, 노트북에서는 config.txt 의 64자리 키
 function Get-DataGoKey {
     if ($env:DATA_GO_KR_KEY) { return $env:DATA_GO_KR_KEY.Trim() }
-    $cfg = 'C:\Users\Administrator\Desktop\프로젝트\config.txt'
-    if (Test-Path $cfg) {
-        $k = Get-Content $cfg -Encoding UTF8 | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^[0-9a-fA-F]{64}$' } | Select-Object -First 1
-        if ($k) { return $k }
-    }
-    throw 'DATA_GO_KR_KEY 가 없습니다.'
+    $k = Get-ConfigLine { $_ -match '^[0-9a-fA-F]{64}$' }
+    if ($k) { return $k }
+    throw 'DATA_GO_KR_KEY 가 없습니다. (노트북에서는 수집 폴더의 config.txt 에 64자리 공공데이터포털 키)'
 }
 $key = Get-DataGoKey
 $ek  = [Uri]::EscapeDataString($key)

@@ -5,8 +5,8 @@
 param([string]$Part, [string]$Since)
 
 . "$PSScriptRoot/common.ps1"
-$Src = 'C:\Users\Administrator\Desktop\프로젝트'
-if (-not (Test-Path $Src)) { throw "노트북 프로젝트 폴더가 없습니다: $Src" }
+$Src = Get-LaptopRoot   # 바탕화면\서울 데이터 정기 수집 또는 바탕화면\프로젝트
+if (-not $Src) { throw "노트북 수집 폴더를 찾지 못했습니다 (바탕화면\서울 데이터 정기 수집 또는 바탕화면\프로젝트)" }
 
 function Read-GzText([string]$path) {
     $fs = [IO.File]::OpenRead($path)
