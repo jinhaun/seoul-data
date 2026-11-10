@@ -1,0 +1,22 @@
+name: 수집 알림 시험
+
+# 슬랙 #test 로 '시험 알림' 한 통을 보내 알림이 잘 오는지 확인 (손으로 실행할 때만)
+# 실제 수집 알림은 '실시간 수집'(hourly.yml) 이어달리기가 10분마다 확인하며 보냄
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: 시험 알림 보내기
+        shell: pwsh
+        env:
+          SLACK_WEBHOOK_TEST: ${{ secrets.SLACK_WEBHOOK_TEST }}
+        run: ./scripts/watch_alert.ps1 -Test
