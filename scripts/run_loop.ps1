@@ -8,11 +8,12 @@
 #  3) 아침 9시 이후 오늘 매일 작업을 아직 안 했으면: 행사·숙박·외국인·환율 + 항공(어제·오늘)
 #  4) 바뀐 게 있으면: 사이트 요약 → 원본을 Releases에 보관 → 저장소에 올리기
 
-param([int]$Minutes = 330)
+param([int]$Minutes = 330, [switch]$AlertTest)
 
 . "$PSScriptRoot/common.ps1"
 Set-Location $RepoRoot
 $end = (Get-Date).AddMinutes($Minutes)
+if ($AlertTest) { & "$PSScriptRoot/watch_alert.ps1" -Test }   # 손으로 실행할 때 '시험 알림' 한 통
 
 function Invoke-Git([string[]]$a) { & git @a 2>&1 | ForEach-Object { "$_" } | Write-Host; return $LASTEXITCODE }
 
@@ -31,6 +32,9 @@ function Invoke-Cycle {
     # 2) 실시간 (실패하면 바퀴 수를 셈 → 아래에서 연속 실패면 일찍 바통 넘김)
     & "$PSScriptRoot/collect_hourly.ps1"
     if ($LASTEXITCODE -ne 0) { $script:fails++ } else { $script:fails = 0 }
+
+    # 놓친 시간대가 생기거나 다시 받기 시작하면 슬랙 #test 로 알림 (문제가 있을 때만)
+    try { & "$PSScriptRoot/watch_alert.ps1" } catch { Write-Host "::warning::알림 확인 실패: $($_.Exception.Message)" }
 
     # 3) 매일 작업 (9시 이후, 오늘 기록이 없을 때만)
     $now = Get-KstNow; $today = $now.ToString('yyyy-MM-dd')

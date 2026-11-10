@@ -16,6 +16,10 @@ on:
         description: '이번 주자가 돌 시간(분)'
         required: false
         default: '330'
+      alert_test:
+        description: '슬랙 #test 로 시험 알림 보내기 (yes / no)'
+        required: false
+        default: 'no'
 
 permissions:
   contents: write
@@ -43,7 +47,8 @@ jobs:
           SEOUL_API_KEY: ${{ secrets.SEOUL_API_KEY }}
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
           GH_TOKEN: ${{ github.token }}
-        run: ./scripts/run_loop.ps1 -Minutes ${{ inputs.minutes || '330' }}
+          SLACK_WEBHOOK_TEST: ${{ secrets.SLACK_WEBHOOK_TEST }}   # 놓친 시간 알림 (문제가 있을 때만)
+        run: ./scripts/run_loop.ps1 -Minutes ${{ inputs.minutes || '330' }} ${{ inputs.alert_test == 'yes' && '-AlertTest' || '' }}
 
       - name: 다음 주자 실행 (바통 넘기기)
         if: always()
