@@ -11,6 +11,7 @@
 param([switch]$Test, [string]$At, [switch]$DryRun, [string]$From = '2026-11-10 12:00')
 
 . "$PSScriptRoot/common.ps1"
+. "$PSScriptRoot/collection_quality.ps1"
 
 $AlertFrom = [datetime]::ParseExact($From, 'yyyy-MM-dd HH:mm', $null)   # 이 시각 이전 시간대는 알리지 않음 (알림을 만든 때)
 $logPath = Join-Path $RepoRoot 'data/status/알림기록.csv'
@@ -24,6 +25,7 @@ function Send-Alert([string]$text) {
     return ($LASTEXITCODE -eq 0)
 }
 function Add-AlertLog([string]$kind, [string[]]$slots) {
+    if ($DryRun) { return }
     Add-CsvRows $logPath @([pscustomobject][ordered]@{ '보낸시각' = $kst.ToString('yyyy-MM-dd HH:mm'); '종류' = $kind; '시간대' = ($slots -join ' ') })
 }
 function Show-Slot([string]$s) { "$([int]$s.Substring(5,2))/$([int]$s.Substring(8,2)) $($s.Substring(11,2))시" }
@@ -35,6 +37,16 @@ if ($Test) {
 }
 
 # 저장된 시간대 (노트북·GitHub 모두, 받은 곳 1곳 이상)
+# 재시도 시간을 준 뒤 장소 단위 누락도 한 번만 알립니다. 새 검사표가 있는 시간만 대상입니다.
+$checks = @(Read-Csv (Join-Path $RepoRoot 'data/status/수집완료검사.csv'))
+$partialLog = @(Read-Csv $logPath)
+$partialGaps = @(Get-FinalPartialGaps $checks $partialLog $kst)
+if ($partialGaps.Count) {
+    $details = @($partialGaps | ForEach-Object { "$(Show-Slot $_.'시간대'): $($_.'유효수')/$($_.'대상수')곳, 누락 $($_.'누락장소')" }) -join "`n"
+    if (Send-Alert ("⚠️ [서울 데이터] 장소별 자료가 끝내 채워지지 않았어요. 재시도 후 남은 누락입니다. 다른 시각 자료로 채우지 않았어요.`n" + $details)) {
+        foreach ($gap in $partialGaps) { Add-AlertLog '부분누락' @($gap.'시간대') }
+    }
+}
 $saved = @{}
 foreach ($r in (Read-Csv (Join-Path $RepoRoot 'data/status/수집기록.csv'))) {
     if ("$($r.'인구기준시각')".Length -ge 13 -and [int]"0$($r.'성공')" -gt 0) { $saved[$r.'인구기준시각'.Substring(0, 13)] = $true }
