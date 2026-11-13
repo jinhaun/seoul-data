@@ -40,3 +40,17 @@ Assert (@(Get-FinalPartialGaps $checks $alert ([datetime]'2026-11-13 13:00')).Co
 $checks += [pscustomobject]@{ '시간대'=$slot; '상태'='완료'; '누락장소'='' }
 Assert (@(Get-FinalPartialGaps $checks @() ([datetime]'2026-11-13 13:00')).Count -eq 0) '재시도로 채워지면 알림 없음'
 Write-Host '전체 검사 통과 (외부 통신·인증값·슬랙 전송 없음)'
+# 요청 함수가 부모 범위의 설정을 참조하는 실제 구조로 변수 충돌 재발을 검사합니다.
+$key = '시험용-설정'; $script:authFailures = 0
+$fetchPacket = { param($place)
+    if ($key -ne '시험용-설정') { $script:authFailures++; throw '시험용 인증 설정 충돌' }
+    [pscustomobject]@{ Row=(New-Row $place); Raw='{}' }
+}
+$provider = { param($place) & $fetchPacket $place }
+$r = Invoke-PlaceCollection $slot $names @() $provider {}
+Assert ($r.Missing.Count -eq 0 -and $script:authFailures -eq 0) '121곳 연속 요청에서 부모 인증 설정 보존'
+$msg = Get-PartialAlertText @([pscustomobject]@{ '시간대'=$slot; '대상수'=121; '누락장소'='노량진 / 대림역' })
+Assert ($msg -match '노량진, 대림역' -and $msg -notmatch '121|119|완료') '경고에는 미수집 장소만 표시'
+$many = @([pscustomobject]@{ '시간대'=$slot; '대상수'=121; '누락장소'=($names[0..99] -join ' / ') })
+$msg = Get-PartialAlertText $many
+Assert ($msg.Length -lt 500 -and $msg -match '외 90곳' -and $msg -match 'https://github.com') '대량 누락은 짧게 표시하고 전체 목록 연결'

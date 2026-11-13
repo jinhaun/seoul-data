@@ -15,6 +15,8 @@ function Add-CsvRows([string]$p, $rows) {
 }
 $script:attempt = @{}
 function Get-Text([string]$url, $referer) {
+    # 단순 응답 모형도 실제 요청의 인증 설정값을 검사해야 변수 충돌을 잡습니다.
+    if ($url -notlike 'http://openapi.seoul.go.kr:8088/시험전용/json/citydata/1/5/*') { throw '시험용 요청 인증 설정이 변경됐습니다.' }
     $n = [Uri]::UnescapeDataString(($url -split '/')[-1])
     $script:attempt[$n]++
     $scenarioPath = Join-Path $RepoRoot 'scenario.txt'

@@ -42,8 +42,7 @@ $checks = @(Read-Csv (Join-Path $RepoRoot 'data/status/수집완료검사.csv'))
 $partialLog = @(Read-Csv $logPath)
 $partialGaps = @(Get-FinalPartialGaps $checks $partialLog $kst)
 if ($partialGaps.Count) {
-    $details = @($partialGaps | ForEach-Object { "$(Show-Slot $_.'시간대'): $($_.'유효수')/$($_.'대상수')곳, 누락 $($_.'누락장소')" }) -join "`n"
-    if (Send-Alert ("⚠️ [서울 데이터] 장소별 자료가 끝내 채워지지 않았어요. 재시도 후 남은 누락입니다. 다른 시각 자료로 채우지 않았어요.`n" + $details)) {
+    if (Send-Alert (Get-PartialAlertText $partialGaps)) {
         foreach ($gap in $partialGaps) { Add-AlertLog '부분누락' @($gap.'시간대') }
     }
 }

@@ -2,7 +2,7 @@
 . "$PSScriptRoot/common.ps1"
 . "$PSScriptRoot/collection_quality.ps1"
 trap { Write-Host '::error::수집 중단: 통신 또는 저장 오류 (인증값 보호를 위해 원문 생략)'; exit 1 }
-$key = Get-ApiKey
+$seoulApiCredential = Get-ApiKey
 $now = Get-KstNow
 $spots = @(Get-Hotspots)
 $names = @($spots | ForEach-Object { "$($_.'장소')" } | Sort-Object -Unique)
@@ -14,7 +14,7 @@ $existing = @(foreach ($day in @($now.Date.AddDays(-1), $now.Date)) {
 })
 $fetchPacket = {
     param($name)
-    $text = Get-Text ("http://openapi.seoul.go.kr:8088/$key/json/citydata/1/5/" + [Uri]::EscapeDataString($name)) $null
+    $text = Get-Text ("http://openapi.seoul.go.kr:8088/$seoulApiCredential/json/citydata/1/5/" + [Uri]::EscapeDataString($name)) $null
     if ($text -notmatch '"INFO-000"') { throw '응답 오류' }
     return [pscustomobject]@{ Row = (New-RealtimeRow ($text | ConvertFrom-Json).CITYDATA (Get-KstNow).ToString('yyyy-MM-dd HH:mm')); Raw = $text }
 }

@@ -20,7 +20,7 @@ $check = Join-Path $sandbox 'data/status/수집완료검사.csv'
 if (@(Import-Csv $day -Encoding UTF8).Count -ne 119) { throw '119곳 부분 저장 실패' }
 if ((Import-Csv $check -Encoding UTF8 | Select-Object -Last 1).'상태' -ne '미완료') { throw '미완료 기록 실패' }
 $message = & $engine -NoProfile -ExecutionPolicy Bypass -File (Join-Path $sandbox 'scripts/watch_alert.ps1') -DryRun -At '2026-11-13 13:00' -From '2026-11-13 11:00'
-if ($LASTEXITCODE -ne 0 -or "$message" -notmatch '장소120 / 장소121') { throw '부분 누락 알림 내용 실패' }
+if ($LASTEXITCODE -ne 0 -or "$message" -notmatch '장소120, 장소121' -or "$message" -match '장소119|119/121') { throw '부분 누락 알림 내용 실패' }
 if (Test-Path (Join-Path $sandbox 'data/status/알림기록.csv')) { throw '시험 실행이 알림 기록을 남겼습니다.' }
 Write-Host '통과: 실제 알림기에서 두 누락 장소 확인, 전송 없는 시험은 기록을 남기지 않음'
 Run-Collector 'normal'

@@ -37,8 +37,8 @@ function Invoke-PlaceCollection([string]$Slot, $Names, $Existing, [scriptblock]$
                 $row = $packet.Row
                 if (-not (Test-PopulationRow $row) -or $row.'장소' -ne $name) { continue }
                 # 다른 시간 응답은 실제 시각대로 보존하고 목표 시간 완료로 세지 않습니다.
-                $key = (Get-RowSlot $row) + '|' + $name
-                if (-not $seen[$key]) { $all.Add($row); $added.Add($packet); $seen[$key] = $true }
+                $observationKey = (Get-RowSlot $row) + '|' + $name
+                if (-not $seen[$observationKey]) { $all.Add($row); $added.Add($packet); $seen[$observationKey] = $true }
             } catch { Write-Host "재수집 대상: $name (통신 또는 응답 오류)" }
         }
     }
@@ -52,4 +52,22 @@ function Get-FinalPartialGaps($Checks, $AlertLog, [datetime]$Now) {
         $time = [datetime]::ParseExact($last.'시간대', 'yyyy-MM-dd HH', $null)
         if ($last.'상태' -ne '완료' -and $Now -ge $time.AddMinutes(110) -and -not $notified[$last.'시간대']) { $last }
     }
+}
+function Get-PartialAlertText($Gaps) {
+    $lines = @('⚠️ 서울 데이터 미수집')
+    foreach ($gap in $Gaps) {
+        $missingNames = @(("$($gap.'누락장소')" -split ' / ') | Where-Object { $_ })
+        $label = $gap.'시간대'.Substring(5).Replace('-', '/') + '시'
+        if ($missingNames.Count -ge [int]$gap.'대상수') {
+            $lines += "$label : 전체 장소 미수집"
+        } else {
+            $shortNames = ($missingNames | Select-Object -First 10) -join ', '
+            $more = if ($missingNames.Count -gt 10) { " 외 $($missingNames.Count - 10)곳" } else { '' }
+            $lines += "$label 미수집 $($missingNames.Count)곳: $shortNames$more"
+        }
+    }
+    if (@($Gaps | Where-Object { @(("$($_.'누락장소')" -split ' / ') | Where-Object {$_}).Count -gt 10 }).Count) {
+        $lines += '전체 누락 목록: https://github.com/jinhaun/seoul-data/blob/main/data/status/수집완료검사.csv'
+    }
+    return ($lines -join "`n")
 }
