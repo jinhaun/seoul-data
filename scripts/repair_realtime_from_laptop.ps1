@@ -1,5 +1,5 @@
 ﻿# 지정 날짜의 누락 시간만 실제 노트북 관측으로 보충합니다. 기존 행·원본은 보존합니다.
-param([Parameter(Mandatory=$true)][string]$Date, [string]$SourceRoot)
+param([Parameter(Mandatory=$true)][string]$Date, [string]$SourceRoot, [int[]]$Hours)
 . "$PSScriptRoot/common.ps1"
 . "$PSScriptRoot/collection_quality.ps1"
 if (-not $SourceRoot) { $SourceRoot = Get-LaptopRoot }
@@ -15,6 +15,7 @@ if ($dateFolder.Count -ne 1) { throw '해당 날짜 원본 폴더를 하나로 �
 $files = @(Get-ChildItem -LiteralPath $dateFolder[0].FullName -File | Where-Object { $_.Name -match '^\d{4}\.json\.gz$' } | Sort-Object Name)
 $total = 0
 foreach ($file in $files) {
+    if ($Hours -and [int]$file.Name.Substring(0,2) -notin $Hours) { continue }
     $fs=[IO.File]::OpenRead($file.FullName)
     $gz=New-Object IO.Compression.GZipStream($fs,[IO.Compression.CompressionMode]::Decompress)
     $reader=New-Object IO.StreamReader($gz,[Text.Encoding]::UTF8)

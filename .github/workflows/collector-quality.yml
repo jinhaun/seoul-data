@@ -1,0 +1,25 @@
+name: 수집기 오류 재발 검사
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/collect_hourly.ps1'
+      - 'scripts/collection_quality.ps1'
+      - 'scripts/watch_alert.ps1'
+      - 'tests/**'
+      - '.github/workflows/collector-quality.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: 인증 설정 보존과 누락 재시도 검사
+        shell: pwsh
+        run: ./tests/collection_quality.tests.ps1
+      - name: 가짜 응답으로 저장과 알림 검사
+        shell: pwsh
+        run: ./tests/collector_integration.tests.ps1
