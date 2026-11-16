@@ -62,8 +62,6 @@ def main():
         record(BOT, "실패"); sys.exit(code)
     if channel != "test" and not DRY:
         record(BOT, "게시")
-        from brief import record_topics
-        record_topics(ref)  # 다음 3일 동안 같은 유형 주제 반복 방지
     issues = json.loads((HERE / "리포트" / f"{tag}_지표.json").read_text(encoding="utf-8"))["품질"]
     if issues and channel != "test":
         notify(f"🔎 서울 브리핑 데이터 품질 경고 (기준일 {ref}): " + " / ".join(issues))

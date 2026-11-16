@@ -46,7 +46,7 @@ class LodgingChecks(unittest.TestCase):
         report = brief.lodging(REF)
         text = brief.lodging_text(report)
         body = {"blocks": [{"type": "section", "text": {"type": "mrkdwn",
-                "text": f"*🏨 ⑤ 서울 숙박업소 변화* ({REF} 수집)\n{text}"}}]}
+                "text": f"*🏨 ④ 서울 숙박업소 변화* ({REF} 수집)\n{text}"}}]}
         return report, text, body
 
     def verify(self, report, text, body):
