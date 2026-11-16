@@ -1,5 +1,5 @@
 """서울 외국인 데일리 숫자 검증 (number-checker): brief.py(pandas)와 다른 방법(csv 모듈로 한 줄씩)으로 다시 계산해 대조한다.
-대상: ① 5개국 추이 ② 환율 ③ 쇼츠 주제 근거 숫자(유형별 재계산) + 출력 형식
+대상: ① 5개국 추이 ② 환율 ③ 쇼츠 주제 근거 숫자(유형별 재계산) ④ 숙박 신규·변경·삭제·업소 예시 + 출력 형식
 사용: python -X utf8 verify_brief.py <기준일>      마지막 줄: "통과" 또는 "보류: 이유" (종료코드 0/1)
 """
 import os
@@ -28,6 +28,63 @@ def num(x):
 
 def close(a, b, tol=0.05):
     return a is not None and b is not None and abs(a - b) <= tol
+
+
+def verify_lodging(ref, report, md, slack_json):
+    """변경 원문을 csv 행별로 다시 세고, 수집 기록·지표·표시 문구를 독립 대조한다."""
+    problems = []
+    source = DATA / "status" / "숙박기록.csv"
+    logs = list(rows(source)) if source.exists() else []
+    expected = {"기준일": str(ref), "종류": []}
+    required_lines = []
+    for kind in ("호텔", "외국인민박", "숙박업"):
+        entry = None
+        for row in logs:
+            if row["날짜"] == str(ref) and row["종류"] == kind:
+                entry = row
+        item = {"종류": kind, "상태": "오늘 자료 없음", "건수": None, "신규업소": []}
+        if entry is None:
+            required_lines.append(f"• {kind}: 오늘 자료 없음")
+        else:
+            counts = {"신규": 0, "변경": 0, "삭제": 0}
+            path = DATA / "lodging" / "changes" / str(ref)[:7] / f"{ref}_{kind}.csv"
+            if path.exists():
+                for row in rows(path):
+                    category = row["구분"]
+                    if category not in counts:
+                        problems.append(f"숙박 {kind}: 원문 구분 오류")
+                        continue
+                    counts[category] += 1
+                    if category == "신규" and len(item["신규업소"]) < 2:
+                        item["신규업소"].append({"업소명": row["업소명"], "자치구": row["자치구"]})
+            if any(counts[k] != int(entry[k]) for k in counts):
+                problems.append(f"숙박 {kind}: 수집 기록·원문 건수 불일치")
+            item["건수"] = counts
+            item["상태"] = "변경 있음" if sum(counts.values()) else "변화 없음"
+            if sum(counts.values()):
+                required_lines.append(f"• {kind}: 신규 {counts['신규']:,} · 변경 {counts['변경']:,} · 삭제 {counts['삭제']:,}건")
+            else:
+                required_lines.append(f"• {kind}: 변화 없음")
+            for example in item["신규업소"]:
+                # 표시 문자열만 정규화한다. 숫자·업소 선택은 위 원문에서 따로 확인했다.
+                name = " ".join(example["업소명"].split()).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;") or "업소명 미상"
+                gu = " ".join(example["자치구"].split()).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;") or "자치구 미상"
+                required_lines.append(f"{name}({gu})")
+        expected["종류"].append(item)
+    if report != expected:
+        problems.append("숙박 지표·신규 업소가 원문과 다름")
+    payload = json.loads(slack_json)
+    sections = [b.get("text", {}).get("text", "") for b in payload.get("blocks", []) if b.get("type") == "section"]
+    lodging_sections = [text for text in sections if text.startswith("*🏨 ⑤ 서울 숙박업소 변화*")]
+    if len(lodging_sections) != 1:
+        problems.append("슬랙 숙박 항목 없음 또는 중복")
+    else:
+        for text in required_lines:
+            if text not in lodging_sections[0] or text not in md:
+                problems.append("숙박 표시 누락·불일치: " + text)
+        if f"({ref} 수집)" not in lodging_sections[0] or "직전 수집 목록 대비" not in lodging_sections[0]:
+            problems.append("숙박 기준일·목록 비교 안내 없음")
+    return problems
 
 
 def main():
@@ -163,6 +220,12 @@ def main():
         # 근거 문장에 쓴 숫자가 제목·근거에 그대로 있는지 (지어낸 숫자 방지는 위 재계산으로)
     if len(J["쇼츠주제"]) != 3:
         P.append(f"쇼츠 주제 {len(J['쇼츠주제'])}개 (3개 아님)")
+
+    # ④ 숙박 원문과 표시를 별도 재계산
+    try:
+        P.extend(verify_lodging(ref, J.get("숙박"), md, S))
+    except (ValueError, KeyError, OSError) as e:
+        P.append(f"숙박 검증 실패: {e}")
 
     # 출력 형식
     try:
