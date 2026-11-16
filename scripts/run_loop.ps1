@@ -51,7 +51,7 @@ function Invoke-Cycle {
     #      → 슬랙 게시 워크플로 실행 (주자마다 한 번만). 올릴지 여부는 slack.yml이 bots/게시기록.csv를 보고 다시 판단함
     if ($done -and -not $script:slackAsked) {
         $plog = Join-Path $RepoRoot 'bots/게시기록.csv'
-        $need = @('서울브리핑'); if ($now.DayOfWeek -eq 'Monday') { $need += '국가대항전', '주간리포트' }
+        $need = @('서울브리핑'); if ($now.DayOfWeek -eq 'Monday') { $need += '주간리포트' }
         $left = @($need | Where-Object { -not ((Test-Path $plog) -and (Select-String -Path $plog -Pattern "`"$today`",`"$_`",`"(게시|보류)`"" -Quiet)) })
         if ($left) {
             gh workflow run slack.yml --ref main *> $null
