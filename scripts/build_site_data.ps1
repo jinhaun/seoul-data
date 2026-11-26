@@ -206,3 +206,9 @@ $dst = Join-Path $RepoRoot 'site/data.json'
 New-Item -ItemType Directory -Force -Path (Split-Path $dst -Parent) | Out-Null
 [IO.File]::WriteAllText($dst, $json, $Utf8)
 Write-Host "사이트 데이터: $dst ($([int]($json.Length / 1KB))KB)"
+
+# 원천 수집 자료가 갱신될 때 방문 시간 비교표도 함께 계산합니다. 외부 패키지·인증값 불필요.
+$patternPython = Get-Command python,python3 -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $patternPython) { throw '방문 시간 비교표를 계산할 파이썬이 없습니다.' }
+& $patternPython.Source (Join-Path $PSScriptRoot 'build_visit_patterns.py') --source $RepoRoot --output $RepoRoot
+if ($LASTEXITCODE -ne 0) { throw '방문 시간 비교표 계산 실패: 이전 표를 최신으로 표시하지 않습니다.' }

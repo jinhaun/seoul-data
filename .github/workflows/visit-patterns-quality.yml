@@ -1,0 +1,23 @@
+name: 방문 시간 평균 계산 검사
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/build_visit_patterns.py'
+      - 'scripts/build_site_data.ps1'
+      - 'site/visit-patterns.js'
+      - 'tests/test_visit_patterns.py'
+      - '.github/workflows/visit-patterns-quality.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: 날짜별 비중과 누락·중복 계산 검사
+        run: python3 -m unittest discover -s tests -p 'test_visit_patterns.py' -v
+      - name: 화면 프로그램 문법 검사
+        run: node --check site/visit-patterns.js
