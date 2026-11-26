@@ -506,6 +506,6 @@ fetch('site/seoul_gu.geojson').then(r => r.json()).then(g => { window.GU = g; })
   .then(() => fetch('site/data.json', {cache: 'no-store'})).then(r => r.json()).then(d => document.fonts.ready.then(() => render(d)))
   .catch(e => { $('headline').textContent = '자료를 불러오지 못했어요.'; console.error(e); });
 </script>
-<script src="site/visit-patterns.js" defer></script>
+<script src="site/visit-patterns.js?v=20261126-periods" defer></script>
 </body>
 </html>
