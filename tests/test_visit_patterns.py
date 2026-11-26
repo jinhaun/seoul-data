@@ -11,6 +11,44 @@ SPEC.loader.exec_module(module)
 
 
 class PatternsTest(unittest.TestCase):
+    def test_calendar_month_boundaries(self):
+        self.assertEqual(module.months_before(date(2026, 3, 31), 1), date(2026, 2, 28))
+        self.assertEqual(module.months_before(date(2024, 3, 31), 1), date(2024, 2, 29))
+        self.assertEqual(module.months_before(date(2024, 2, 29), 12), date(2023, 2, 28))
+        self.assertEqual(module.months_before(date(2026, 11, 26), 3), date(2026, 8, 26))
+
+    def test_long_period_and_archive_separate_precollection_missing_and_today(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            folder = root/'data/realtime/2026-11'
+            folder.mkdir(parents=True)
+            fields = ['장소', '인구기준시각', '인구_최소', '인구_최대', '혼잡도']
+            for day, rows in [('07', [['천호역','2026-11-07 14:00',0,0,'여유'],['천호역','2026-11-07 14:30',100,200,'보통']]),
+                              ('26', [['천호역','2026-11-26 14:00',9000,11000,'붐빔']])]:
+                with (folder/f'2026-11-{day}.csv').open('w', encoding='utf-8-sig', newline='') as f:
+                    writer=csv.writer(f);writer.writerow(fields);writer.writerows(rows)
+            loaded=module.load_observations(root,date(2026,11,26))
+            result=module.aggregate(root,date(2026,11,26),months=12,loaded=loaded)
+            self.assertEqual(result['period']['start'],'2025-11-26')
+            self.assertEqual(result['period']['days'],365)
+            self.assertEqual(result['period']['available_days'],1)
+            self.assertEqual(result['period']['possible_dates'][5],3)
+            self.assertEqual(result['places'][0]['grid'][5][14][:2],[75,1])
+            module.save_outputs(result,root,'12')
+            manifest=module.build_history(loaded,root,date(2026,11,26))
+            self.assertEqual(manifest['dates'],['2026-11-07','2026-11-26'])
+            import json
+            history=json.loads((root/'site/history/2026-11/2026-11-07.json').read_text(encoding='utf-8'))
+            hours=history['places'][0]['hours']
+            self.assertIsNone(hours[13])
+            self.assertEqual(hours[14][:3],[75,50,100])
+            self.assertEqual(hours[14][3],[['14:00',0,0,'여유'],['14:30',100,200,'보통']])
+            self.assertIsNone(hours[15])
+            with (root/'data/analysis/방문시간_요일시간_12개월.csv').open(encoding='utf-8-sig',newline='') as f:
+                row=next(r for r in csv.DictReader(f) if r['요일']=='토' and r['시간']=='14')
+            self.assertEqual(row['수집후누락날짜수'],'2')
+            self.assertEqual(int(row['수집전날짜수'])+int(row['수집후누락날짜수']),int(row['누락날짜수']))
+
     def test_equal_day_weight_duplicates_zero_missing_and_partial_day(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
